@@ -305,6 +305,17 @@ table.ledger td.num { font-family: var(--font-data); font-variant-numeric: tabul
 details summary { cursor: pointer; color: var(--turmeric-ink); font-weight: 600; }
 details pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 340px; font-size: .7rem; color: var(--ink-soft); }
 small { color: var(--steel); }
+.check-label { display: inline-flex !important; align-items: center; gap: 8px; cursor: pointer; }
+.check-label input { width: auto; }
+.line-items { display: grid; gap: 8px; margin: 8px 0; }
+.line-item-row { display: grid; grid-template-columns: minmax(130px,2fr) repeat(4,minmax(72px,1fr)) auto; gap: 7px; align-items: center; }
+.line-item-row input { min-width: 0; padding: 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--paper-sunken); }
+.denomination-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(90px,1fr)); gap: 8px; margin-bottom: 10px; }
+.denomination-grid label { font-size: .78rem; color: var(--ink-soft); font-weight: 600; }
+.denomination-grid input { width: 100%; margin-top: 3px; padding: 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--paper-sunken); }
+.closing-preview { margin: 2px 0 16px; padding: 10px 12px; background: var(--paper-sunken); border: 1px dashed var(--border); border-radius: var(--radius); }
+.closing-metrics { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; color: var(--ink-soft); font-size: .82rem; }
+@media (max-width: 740px) { .line-item-row { grid-template-columns: 1fr 1fr; } .line-item-row .remove-item { grid-column: 2; } }
 @media (max-width: 640px) { .screen-head { display: block; } .screen-head .btn { margin-top: 10px; } .form-grid { grid-template-columns: 1fr; } }
 
 /* ============================================================================

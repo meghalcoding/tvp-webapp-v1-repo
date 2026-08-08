@@ -3,6 +3,7 @@ import { signIn, signOut, getSession, getCurrentAppUser, onAuthStateChange, canD
 import { exportFullBackup, exportModuleBackups } from "./backup.js";
 import { getPendingCount, syncOutbox } from "./offline-queue.js";
 import { renderAccountsScreen, renderTransfersScreen, renderLedgerScreen, renderAuditLogScreen } from "./financial-engine.js";
+import { renderSalesScreen, renderExpensesScreen, renderUpiScreen, renderDailyClosingScreen } from "./daily-operations.js";
 
 // ============================================================================
 // NAV TREE — exactly the structure in spec §15
@@ -14,12 +15,12 @@ const NAV = [
   {
     group: "Operations",
     items: [
-      { path: "sales", label: "Sales", icon: "₹", phase: "Phase 3 — Daily Operations" },
+      { path: "sales", label: "Sales", icon: "₹" },
       { path: "purchases", label: "Purchases", icon: "▤", phase: "Phase 4 — Procurement & Inventory" },
-      { path: "expenses", label: "Expenses", icon: "✎", phase: "Phase 3 — Daily Operations" },
+      { path: "expenses", label: "Expenses", icon: "✎" },
       { path: "inventory", label: "Inventory", icon: "▦", phase: "Phase 4 — Procurement & Inventory" },
       { path: "wastage", label: "Wastage", icon: "✕", phase: "Phase 4 — Procurement & Inventory" },
-      { path: "daily-closing", label: "Daily Closing", icon: "✓", phase: "Phase 3 — Daily Operations" },
+      { path: "daily-closing", label: "Daily Closing", icon: "✓" },
     ],
   },
   {
@@ -27,7 +28,7 @@ const NAV = [
     items: [
       { path: "accounts", label: "Cash & Accounts", icon: "$" },
       { path: "ledger", label: "Transaction Ledger", icon: "≡" },
-      { path: "upi", label: "UPI Reconciliation", icon: "⇄", phase: "Phase 3 — Daily Operations" },
+      { path: "upi", label: "UPI Reconciliation", icon: "⇄" },
       { path: "transfers", label: "Transfers", icon: "→" },
       { path: "supplier-dues", label: "Supplier Dues", icon: "⌘", phase: "Phase 4 — Procurement & Inventory" },
     ],
@@ -203,6 +204,10 @@ async function renderRoute() {
     transfers: (target) => renderTransfersScreen(target, currentAppUser),
     ledger: (target) => renderLedgerScreen(target, currentAppUser),
     "audit-log": (target) => renderAuditLogScreen(target, currentAppUser),
+    sales: (target) => renderSalesScreen(target, currentAppUser),
+    expenses: (target) => renderExpensesScreen(target, currentAppUser),
+    upi: (target) => renderUpiScreen(target, currentAppUser),
+    "daily-closing": (target) => renderDailyClosingScreen(target, currentAppUser),
   };
 
   if (renderers[path]) {
@@ -302,12 +307,12 @@ async function renderDashboard(screen) {
     <div class="card">
       <div class="card-title">Quick Actions</div>
       <div class="fab-row">
-        <button class="btn btn-primary" disabled title="Ships in Phase 3">+ Sale</button>
+        <button class="btn btn-primary" id="quick-sale">+ Sale</button>
         <button class="btn btn-primary" disabled title="Ships in Phase 4">+ Purchase</button>
-        <button class="btn btn-primary" disabled title="Ships in Phase 3">+ Expense</button>
+        <button class="btn btn-primary" id="quick-expense">+ Expense</button>
         <button class="btn" id="quick-transfer">+ Money Transfer</button>
         <button class="btn" disabled title="Ships in Phase 4">+ Stock Adjustment</button>
-        <button class="btn" disabled title="Ships in Phase 3">+ Daily Closing</button>
+        <button class="btn" id="quick-closing">+ Daily Closing</button>
       </div>
       <p style="font-size:0.78rem;color:var(--steel);margin-top:10px;margin-bottom:0;">
         Quick Actions are wired up to their real forms starting Phase 2. This dashboard already reads
@@ -315,6 +320,9 @@ async function renderDashboard(screen) {
       </p>
     </div>`;
   document.getElementById("quick-transfer")?.addEventListener("click", () => { location.hash = "#/transfers"; });
+  document.getElementById("quick-sale")?.addEventListener("click", () => { location.hash = "#/sales"; });
+  document.getElementById("quick-expense")?.addEventListener("click", () => { location.hash = "#/expenses"; });
+  document.getElementById("quick-closing")?.addEventListener("click", () => { location.hash = "#/daily-closing"; });
 }
 
 function notConfiguredCard() {
