@@ -4,6 +4,7 @@ import { exportFullBackup, exportModuleBackups } from "./backup.js";
 import { getPendingCount, syncOutbox } from "./offline-queue.js";
 import { renderAccountsScreen, renderTransfersScreen, renderLedgerScreen, renderAuditLogScreen } from "./financial-engine.js";
 import { renderSalesScreen, renderExpensesScreen, renderUpiScreen, renderDailyClosingScreen } from "./daily-operations.js";
+import { renderPurchasesScreen, renderInventoryScreen, renderWastageScreen, renderSupplierDuesScreen } from "./procurement-inventory.js";
 
 // ============================================================================
 // NAV TREE — exactly the structure in spec §15
@@ -16,10 +17,10 @@ const NAV = [
     group: "Operations",
     items: [
       { path: "sales", label: "Sales", icon: "₹" },
-      { path: "purchases", label: "Purchases", icon: "▤", phase: "Phase 4 — Procurement & Inventory" },
+      { path: "purchases", label: "Purchases", icon: "▤" },
       { path: "expenses", label: "Expenses", icon: "✎" },
-      { path: "inventory", label: "Inventory", icon: "▦", phase: "Phase 4 — Procurement & Inventory" },
-      { path: "wastage", label: "Wastage", icon: "✕", phase: "Phase 4 — Procurement & Inventory" },
+      { path: "inventory", label: "Inventory", icon: "▦" },
+      { path: "wastage", label: "Wastage", icon: "✕" },
       { path: "daily-closing", label: "Daily Closing", icon: "✓" },
     ],
   },
@@ -30,7 +31,7 @@ const NAV = [
       { path: "ledger", label: "Transaction Ledger", icon: "≡" },
       { path: "upi", label: "UPI Reconciliation", icon: "⇄" },
       { path: "transfers", label: "Transfers", icon: "→" },
-      { path: "supplier-dues", label: "Supplier Dues", icon: "⌘", phase: "Phase 4 — Procurement & Inventory" },
+      { path: "supplier-dues", label: "Supplier Dues", icon: "⌘" },
     ],
   },
   {
@@ -48,8 +49,8 @@ const NAV = [
   {
     group: "Masters",
     items: [
-      { path: "master-items", label: "Items", icon: "•", phase: "Phase 4 — Procurement & Inventory" },
-      { path: "master-suppliers", label: "Suppliers", icon: "•", phase: "Phase 4 — Procurement & Inventory" },
+      { path: "master-items", label: "Items", icon: "•" },
+      { path: "master-suppliers", label: "Suppliers", icon: "•" },
       { path: "master-categories", label: "Expense Categories", icon: "•", phase: "Phase 2 — Financial Engine" },
       { path: "master-accounts", label: "Accounts", icon: "•" },
       { path: "master-users", label: "Users", icon: "•", phase: "Phase 2 — Financial Engine" },
@@ -208,6 +209,12 @@ async function renderRoute() {
     expenses: (target) => renderExpensesScreen(target, currentAppUser),
     upi: (target) => renderUpiScreen(target, currentAppUser),
     "daily-closing": (target) => renderDailyClosingScreen(target, currentAppUser),
+    purchases: (target) => renderPurchasesScreen(target, currentAppUser),
+    inventory: (target) => renderInventoryScreen(target, currentAppUser),
+    wastage: (target) => renderWastageScreen(target, currentAppUser),
+    "supplier-dues": (target) => renderSupplierDuesScreen(target, currentAppUser),
+    "master-items": (target) => renderInventoryScreen(target, currentAppUser),
+    "master-suppliers": (target) => renderSupplierDuesScreen(target, currentAppUser),
   };
 
   if (renderers[path]) {
@@ -308,10 +315,10 @@ async function renderDashboard(screen) {
       <div class="card-title">Quick Actions</div>
       <div class="fab-row">
         <button class="btn btn-primary" id="quick-sale">+ Sale</button>
-        <button class="btn btn-primary" disabled title="Ships in Phase 4">+ Purchase</button>
+        <button class="btn btn-primary" id="quick-purchase">+ Purchase</button>
         <button class="btn btn-primary" id="quick-expense">+ Expense</button>
         <button class="btn" id="quick-transfer">+ Money Transfer</button>
-        <button class="btn" disabled title="Ships in Phase 4">+ Stock Adjustment</button>
+        <button class="btn" id="quick-inventory">+ Stock Adjustment</button>
         <button class="btn" id="quick-closing">+ Daily Closing</button>
       </div>
       <p style="font-size:0.78rem;color:var(--steel);margin-top:10px;margin-bottom:0;">
@@ -323,6 +330,8 @@ async function renderDashboard(screen) {
   document.getElementById("quick-sale")?.addEventListener("click", () => { location.hash = "#/sales"; });
   document.getElementById("quick-expense")?.addEventListener("click", () => { location.hash = "#/expenses"; });
   document.getElementById("quick-closing")?.addEventListener("click", () => { location.hash = "#/daily-closing"; });
+  document.getElementById("quick-purchase")?.addEventListener("click", () => { location.hash = "#/purchases"; });
+  document.getElementById("quick-inventory")?.addEventListener("click", () => { location.hash = "#/inventory"; });
 }
 
 function notConfiguredCard() {

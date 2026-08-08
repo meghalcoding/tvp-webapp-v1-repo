@@ -310,6 +310,9 @@ small { color: var(--steel); }
 .line-items { display: grid; gap: 8px; margin: 8px 0; }
 .line-item-row { display: grid; grid-template-columns: minmax(130px,2fr) repeat(4,minmax(72px,1fr)) auto; gap: 7px; align-items: center; }
 .line-item-row input { min-width: 0; padding: 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--paper-sunken); }
+.line-item-row select { min-width: 0; padding: 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--paper-sunken); color: var(--ink); }
+.line-item-row output { font-family: var(--font-data); font-size: .8rem; text-align: right; white-space: nowrap; }
+.purchase-total { margin: 12px 0; text-align: right; font-family: var(--font-data); }
 .denomination-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(90px,1fr)); gap: 8px; margin-bottom: 10px; }
 .denomination-grid label { font-size: .78rem; color: var(--ink-soft); font-weight: 600; }
 .denomination-grid input { width: 100%; margin-top: 3px; padding: 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--paper-sunken); }
