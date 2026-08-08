@@ -2,6 +2,7 @@ import { supabase, IS_CONFIGURED } from "./supabase-client.js";
 import { signIn, signOut, getSession, getCurrentAppUser, onAuthStateChange, canDo } from "./auth.js";
 import { exportFullBackup, exportModuleBackups } from "./backup.js";
 import { getPendingCount, syncOutbox } from "./offline-queue.js";
+import { renderAccountsScreen, renderTransfersScreen, renderLedgerScreen, renderAuditLogScreen } from "./financial-engine.js";
 
 // ============================================================================
 // NAV TREE — exactly the structure in spec §15
@@ -24,9 +25,10 @@ const NAV = [
   {
     group: "Money",
     items: [
-      { path: "accounts", label: "Cash & Accounts", icon: "$", phase: "Phase 2 — Financial Engine" },
+      { path: "accounts", label: "Cash & Accounts", icon: "$" },
+      { path: "ledger", label: "Transaction Ledger", icon: "≡" },
       { path: "upi", label: "UPI Reconciliation", icon: "⇄", phase: "Phase 3 — Daily Operations" },
-      { path: "transfers", label: "Transfers", icon: "→", phase: "Phase 2 — Financial Engine" },
+      { path: "transfers", label: "Transfers", icon: "→" },
       { path: "supplier-dues", label: "Supplier Dues", icon: "⌘", phase: "Phase 4 — Procurement & Inventory" },
     ],
   },
@@ -48,7 +50,7 @@ const NAV = [
       { path: "master-items", label: "Items", icon: "•", phase: "Phase 4 — Procurement & Inventory" },
       { path: "master-suppliers", label: "Suppliers", icon: "•", phase: "Phase 4 — Procurement & Inventory" },
       { path: "master-categories", label: "Expense Categories", icon: "•", phase: "Phase 2 — Financial Engine" },
-      { path: "master-accounts", label: "Accounts", icon: "•", phase: "Phase 2 — Financial Engine" },
+      { path: "master-accounts", label: "Accounts", icon: "•" },
       { path: "master-users", label: "Users", icon: "•", phase: "Phase 2 — Financial Engine" },
     ],
   },
@@ -56,7 +58,7 @@ const NAV = [
     group: "System",
     items: [
       { path: "backup", label: "Backup", icon: "⇩" },
-      { path: "audit-log", label: "Audit Log", icon: "≡", phase: "Phase 2 — Financial Engine" },
+      { path: "audit-log", label: "Audit Log", icon: "≡" },
       { path: "settings", label: "Settings", icon: "⚙" },
     ],
   },
@@ -99,6 +101,7 @@ async function enterApp() {
   }
   document.getElementById("login-screen").classList.add("hidden");
   document.getElementById("app-shell").classList.remove("hidden");
+  window.__appUser = currentAppUser;
   renderUserBadges();
   renderNav();
   window.addEventListener("hashchange", renderRoute);
@@ -195,6 +198,11 @@ async function renderRoute() {
     dashboard: renderDashboard,
     backup: renderBackupScreen,
     settings: renderSettingsScreen,
+    accounts: (target) => renderAccountsScreen(target, currentAppUser),
+    "master-accounts": (target) => renderAccountsScreen(target, currentAppUser),
+    transfers: (target) => renderTransfersScreen(target, currentAppUser),
+    ledger: (target) => renderLedgerScreen(target, currentAppUser),
+    "audit-log": (target) => renderAuditLogScreen(target, currentAppUser),
   };
 
   if (renderers[path]) {
@@ -297,7 +305,7 @@ async function renderDashboard(screen) {
         <button class="btn btn-primary" disabled title="Ships in Phase 3">+ Sale</button>
         <button class="btn btn-primary" disabled title="Ships in Phase 4">+ Purchase</button>
         <button class="btn btn-primary" disabled title="Ships in Phase 3">+ Expense</button>
-        <button class="btn" disabled title="Ships in Phase 2">+ Money Transfer</button>
+        <button class="btn" id="quick-transfer">+ Money Transfer</button>
         <button class="btn" disabled title="Ships in Phase 4">+ Stock Adjustment</button>
         <button class="btn" disabled title="Ships in Phase 3">+ Daily Closing</button>
       </div>
@@ -306,6 +314,7 @@ async function renderDashboard(screen) {
         live data from Supabase — try recording a row directly in the Supabase table editor to see it appear here.
       </p>
     </div>`;
+  document.getElementById("quick-transfer")?.addEventListener("click", () => { location.hash = "#/transfers"; });
 }
 
 function notConfiguredCard() {
