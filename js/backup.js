@@ -27,7 +27,9 @@ const BACKUP_TABLES = [
 ];
 
 function todayStamp() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
 }
 
 function download(filename, content, mime) {

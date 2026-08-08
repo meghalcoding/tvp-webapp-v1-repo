@@ -272,7 +272,9 @@ async function renderDashboard(screen) {
     return;
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const localNow = new Date();
+  localNow.setMinutes(localNow.getMinutes() - localNow.getTimezoneOffset());
+  const today = localNow.toISOString().slice(0, 10);
 
   const [{ data: accounts, error: accErr }, { data: stock, error: stockErr }, { data: upi, error: upiErr }] =
     await Promise.all([
@@ -462,10 +464,16 @@ async function trySync() {
   const pending = await getPendingCount().catch(() => 0);
   if (pending === 0) return;
   window.__showSyncBanner?.(`Syncing ${pending} transaction${pending === 1 ? "" : "s"}…`);
-  // Real writers (sale/expense/wastage) are registered once those screens
-  // exist (Phase 3/4). For now this just reports the pending count so
-  // nothing is silently lost while offline in the foundation phase.
-  const { synced, total } = await syncOutbox({}, (done, tot) => {
+  const write = async (rpcName, payload) => {
+    const { error } = await supabase.rpc(rpcName, payload);
+    if (error) throw error;
+  };
+  const writers = {
+    sale: (payload) => write("create_sale_idempotent", payload),
+    expense: (payload) => write("create_expense_idempotent", payload),
+    wastage: (payload) => write("record_wastage_idempotent", payload),
+  };
+  const { synced, total } = await syncOutbox(writers, (done, tot) => {
     window.__showSyncBanner?.(`Syncing ${done}/${tot} transactions…`);
   }).catch(() => ({ synced: 0, total: pending }));
   if (synced === total) window.__hideSyncBanner?.();

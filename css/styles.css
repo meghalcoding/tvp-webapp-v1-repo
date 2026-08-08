@@ -39,13 +39,13 @@
 }
 
 * { box-sizing: border-box; }
-html, body { height: 100%; }
+html, body { min-height: 100%; }
 body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-body);
-  font-size: 15px;
+  font-size: clamp(14px, 1.4vw, 16px);
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
 }
@@ -109,6 +109,10 @@ a { color: inherit; }
   border-right: 1px solid var(--border);
   display: none;
   flex-direction: column;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
 }
 .sidebar .signboard { padding: 18px 20px; flex-direction: column; align-items: flex-start; gap: 2px; }
 .sidebar .signboard .wordmark { font-size: 1.3rem; }
@@ -163,7 +167,7 @@ main#screen {
   flex: 1;
   padding: 16px;
   padding-bottom: 84px; /* clear bottom nav on mobile */
-  max-width: 1080px;
+  max-width: 1180px;
   width: 100%;
 }
 
@@ -171,6 +175,11 @@ main#screen {
   .sidebar { display: flex; }
   .topbar { display: none; }
   main#screen { padding: 28px 32px; padding-bottom: 32px; }
+}
+
+@media (min-width: 641px) and (max-width: 899px) {
+  main#screen { padding: 24px; padding-bottom: 88px; }
+  .topbar { padding: 12px 24px; }
 }
 
 /* ============================================================================
@@ -213,7 +222,7 @@ main#screen {
 .grid { display: grid; gap: var(--gap); }
 .grid-2 { grid-template-columns: repeat(2, 1fr); }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }
-@media (max-width: 640px) { .grid-2, .grid-3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 640px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
 
 .stat-row {
   display: flex; justify-content: space-between; align-items: baseline;
@@ -332,6 +341,38 @@ small { color: var(--steel); }
 @media (max-width: 640px) { .report-kpis { grid-template-columns: 1fr 1fr; } .report-filters { align-items: stretch; } }
 @media (max-width: 740px) { .line-item-row { grid-template-columns: 1fr 1fr; } .line-item-row .remove-item { grid-column: 2; } }
 @media (max-width: 640px) { .screen-head { display: block; } .screen-head .btn { margin-top: 10px; } .form-grid { grid-template-columns: 1fr; } }
+
+/* Compact controls and resilient content on phones. Tables retain their
+   accounting columns and scroll horizontally instead of clipping values. */
+@media (max-width: 640px) {
+  main#screen { padding: 12px; padding-bottom: 82px; }
+  .topbar { padding: 8px 12px; gap: 8px; }
+  .topbar .signboard { min-width: 0; overflow: hidden; white-space: nowrap; }
+  #desktop-user-row { display: none !important; }
+  .card { padding: 13px; border-radius: 8px; }
+  .modal-backdrop { padding: 8px; align-items: flex-end; }
+  .modal-card { max-height: calc(100vh - 16px); padding: 20px 16px; border-radius: 12px 12px 6px 6px; }
+  .modal-close { min-width: 44px; min-height: 44px; top: 2px; right: 2px; }
+  .btn { min-height: 42px; justify-content: center; }
+  .btn-small { min-height: 34px; }
+  .field input, .field select, .field textarea { min-height: 44px; }
+  .table-wrap { margin: 0 -13px; padding: 0 13px; -webkit-overflow-scrolling: touch; }
+  table.ledger { min-width: 580px; }
+  .report-kpis { gap: 8px; }
+  .report-kpis > div { min-width: 0; padding: 10px; }
+  .report-kpis strong { overflow-wrap: anywhere; }
+  .bottom-nav { gap: 1px; }
+  .bottom-nav .nav-link { min-width: 0; min-height: 54px; overflow: hidden; }
+  .bottom-nav .nav-link span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .denomination-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 380px) {
+  .wordmark { font-size: 1rem !important; }
+  .user-badge { padding: 4px 7px; font-size: .72rem; }
+  .role-pill { display: none; }
+  .report-kpis { grid-template-columns: 1fr 1fr; }
+}
 
 /* ============================================================================
    EMPTY / PLACEHOLDER STATES

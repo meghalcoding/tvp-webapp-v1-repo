@@ -3,7 +3,8 @@ import { canDo } from "./auth.js";
 
 const money = (v) => `₹${Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const esc = (v = "") => String(v).replace(/[&<>'"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
-const iso = () => new Date().toISOString().slice(0, 10);
+const localDate = (value = new Date()) => { const d = new Date(value); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+const iso = () => localDate();
 const notice = (file) => `<div class="placeholder-screen"><h2>Connect Supabase first</h2><p>Configure <code>js/config.js</code> and run <code>${file}</code> in Supabase SQL Editor.</p></div>`;
 const status = (el, message, bad = false) => { el.textContent = message; el.className = `form-status ${bad ? "error" : "success"}`; };
 const options = (rows, selected = "", label = (r) => r.name) => (rows || []).filter((r) => r.active !== false).map((r) => `<option value="${r.id}" ${r.id === selected ? "selected" : ""}>${esc(label(r))}</option>`).join("");
@@ -44,7 +45,7 @@ function isDue(row, kind, date = new Date()) { const last = row.last_run_date ||
 
 export async function renderAutomationScreen(screen, user) {
   if (!IS_CONFIGURED) { screen.innerHTML = notice("db/phase6_automation.sql"); return; }
-  const allowed = canDo(user, "money_transfer"); const since = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+  const allowed = canDo(user, "money_transfer"); const since = localDate(new Date(Date.now() - 14 * 86400000));
   const [categoriesQ, accountsQ, recurringQ, salariesQ, stockQ, purchasesQ, closingsQ] = await Promise.all([
     supabase.from("expense_categories").select("id,name,active").order("name"), supabase.from("accounts").select("id,name,active").order("name"), supabase.from("recurring_expenses").select("*").order("name"), supabase.from("salary_profiles").select("*").order("employee_name"), supabase.from("current_stock").select("item_id,name,unit,quantity,reorder_level").order("name"), supabase.from("purchase_items").select("item_id,quantity,transactions!inner(txn_date,txn_type)").eq("transactions.txn_type", "purchase").gte("transactions.txn_date", since), supabase.from("monthly_closings").select("*").order("period_start", { ascending: false }).limit(6)
   ]);

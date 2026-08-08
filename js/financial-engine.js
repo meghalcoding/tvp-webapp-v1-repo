@@ -3,7 +3,7 @@ import { canDo } from "./auth.js";
 
 const money = (value) => `₹${Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const esc = (value = "") => String(value).replace(/[&<>'"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 const configuredNotice = () => `<div class="placeholder-screen"><h2>Connect Supabase first</h2><p>Configure the project in <code>js/config.js</code>, then run <code>db/phase2_financial_engine.sql</code> in Supabase SQL Editor.</p></div>`;
 
 async function accountsWithBalances() {

@@ -2,7 +2,7 @@ import { supabase, IS_CONFIGURED } from "./supabase-client.js";
 
 const money=n=>`₹${Number(n||0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 const esc=(v="")=>String(v).replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);};
 const monthStart=()=>`${today().slice(0,8)}01`;
 const configured=()=>`<div class="placeholder-screen"><h2>Connect Supabase first</h2><p>Reports calculate from your live Supabase ledger once configured.</p></div>`;
 const csv=(filename,rows)=>{const keys=Object.keys(rows[0]||{});const value=v=>v==null?"":typeof v==="object"?JSON.stringify(v):String(v);const body=[keys.join(","),...rows.map(r=>keys.map(k=>{const s=value(r[k]);return /[",\n]/.test(s)?`"${s.replaceAll('"','""')}"`:s;}).join(","))].join("\n");const link=document.createElement("a");link.href=URL.createObjectURL(new Blob([body],{type:"text/csv"}));link.download=filename;link.click();URL.revokeObjectURL(link.href);};

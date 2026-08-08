@@ -1,11 +1,27 @@
 import { supabase, IS_CONFIGURED } from "./supabase-client.js";
 import { canDo } from "./auth.js";
+import { withOfflineFallback } from "./offline-queue.js";
 
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);};
 const money=n=>`₹${Number(n||0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 const esc=(v="")=>String(v).replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
 const noConfig=()=>`<div class="placeholder-screen"><h2>Connect Supabase first</h2><p>Configure <code>js/config.js</code>, then run <code>db/phase4_procurement_inventory.sql</code>.</p></div>`;
 const state=(el,text,bad=false)=>{el.textContent=text;el.className=`form-status ${bad?"error":"success"}`;};
+const postOutboxSafe=async(kind,payload,rpcName)=>withOfflineFallback(kind,payload,async(entry)=>{const {error}=await supabase.rpc(rpcName,entry);if(error)throw error;});
+
+// Capture before the legacy form listener so wastage follows the same
+// idempotent offline path as Sales and Quick Expenses.
+document.addEventListener("submit", async (event) => {
+  const form = event.target;
+  if (form?.id !== "wastage-form") return;
+  event.preventDefault(); event.stopImmediatePropagation();
+  const data = new FormData(form); const feedback = form.querySelector(".form-status");
+  const payload = { p_client_uuid: crypto.randomUUID(), p_item_id: data.get("item"), p_quantity: Number(data.get("quantity")), p_reason: data.get("reason"), p_txn_date: data.get("date"), p_description: data.get("note").trim() || null };
+  state(feedback, navigator.onLine ? "Recording wastage…" : "Wastage queued for sync.");
+  try { await postOutboxSafe("wastage", payload, "record_wastage_idempotent"); }
+  catch (error) { state(feedback, error.message, true); return; }
+  if (navigator.onLine) form.reset();
+}, true);
 async function masters(){const [{data:items,error:ierr},{data:suppliers,error:serr},{data:accounts,error:aerr}]=await Promise.all([supabase.from("items").select("id,name,category,unit,gst_rate,last_purchase_rate,active").eq("active",true).order("name"),supabase.from("suppliers").select("id,name,phone").eq("active",true).order("name"),supabase.from("accounts").select("id,name,type").eq("active",true).order("name")]);if(ierr||serr||aerr)throw ierr||serr||aerr;return{items:items||[],suppliers:suppliers||[],accounts:accounts||[]};}
 const optionRows=(rows,label=x=>x.name)=>rows.map(x=>`<option value="${x.id}">${esc(label(x))}</option>`).join("");
 
