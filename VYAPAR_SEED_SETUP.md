@@ -25,6 +25,14 @@ Each transaction is deliberately posted with **today's database date** (`current
 
 This means the imported activity will appear on the cutover date in date-based app reports. If historical, day-by-day reporting is needed later, use a separate reviewed migration that posts the original dates - do **not** rerun this migration.
 
+## Restore original Vyapar reporting dates
+
+If this seed was already run with all entries on the cutover date, run
+[db/vyapar_seed_restore_source_dates.sql](db/vyapar_seed_restore_source_dates.sql)
+once in Supabase SQL Editor. It restores the original dates from the preserved
+audit metadata for all 137 seeded transactions. This is the correct option when
+reports must match the historical Vyapar date range.
+
 ## Important source-data limitation
 
 The transaction report contains three INR 110 purchases from **Water Bottle Vendor** (21, 23, and 24 July) with no matching Item Details row. Their supplier, ledger, and paid-purchase records are included, but no stock quantity is guessed. They are labelled `ITEM DETAIL MISSING IN SOURCE REPORT` in the transaction description and audit log.
