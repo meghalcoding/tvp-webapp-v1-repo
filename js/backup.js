@@ -19,6 +19,10 @@ const BACKUP_TABLES = [
   "settlement_details",
   "stock_movements",
   "daily_closings",
+  "recurring_expenses",
+  "salary_profiles",
+  "salary_payments",
+  "monthly_closings",
   "audit_log",
 ];
 
@@ -49,6 +53,7 @@ export async function exportFullBackup() {
   }
 
   download(`Cravory_Backup_${todayStamp()}.json`, JSON.stringify(backup, null, 2), "application/json");
+  localStorage.setItem("tvp-last-backup-at", new Date().toISOString());
   return backup;
 }
 
@@ -82,6 +87,7 @@ export async function exportModuleBackups() {
     if (error) throw new Error(`Backup failed reading "${name}": ${error.message}`);
     download(`${name}_${todayStamp()}.csv`, toCsv(data ?? []), "text/csv");
   }
+  localStorage.setItem("tvp-last-backup-at", new Date().toISOString());
 }
 
 // Restore from Backup — Owner only (also gated by RLS). Wipes and reloads

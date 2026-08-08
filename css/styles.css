@@ -326,6 +326,9 @@ small { color: var(--steel); }
 .report-kpis span { display: block; color: var(--steel); font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 .report-kpis strong { display: block; margin-top: 4px; font-family: var(--font-data); font-size: 1rem; }
 .pl-total td { border-top: 2px solid var(--border-strong); }
+.automation-sections { margin-top: var(--gap); }
+.automation-alert { margin: 0 0 16px; border-color: var(--turmeric); background: #FFF7E4; }
+.automation-alert a { color: var(--turmeric-ink); font-weight: 700; }
 @media (max-width: 640px) { .report-kpis { grid-template-columns: 1fr 1fr; } .report-filters { align-items: stretch; } }
 @media (max-width: 740px) { .line-item-row { grid-template-columns: 1fr 1fr; } .line-item-row .remove-item { grid-column: 2; } }
 @media (max-width: 640px) { .screen-head { display: block; } .screen-head .btn { margin-top: 10px; } .form-grid { grid-template-columns: 1fr; } }
