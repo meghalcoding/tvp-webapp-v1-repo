@@ -4,7 +4,7 @@
 // only the static shell. Bump CACHE_NAME on every deploy to invalidate.
 // ============================================================================
 
-const CACHE_NAME = "tasty-vadapav-shell-v4";
+const CACHE_NAME = "tasty-vadapav-shell-v5";
 const SHELL_FILES = [
   "./",
   "./index.html",
@@ -46,12 +46,19 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // App shell: cache-first, falling back to network, so the last-deployed
-  // shell always loads even with no connection.
+  // App shell: network-first so a Cloudflare deployment is visible on the
+  // next online launch; the cache remains the offline fallback. Cache-first
+  // would otherwise keep an older app.js (and its older navigation/routes)
+  // alive after a successful deployment.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).catch(() => caches.match("./index.html"));
-    })
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok && event.request.method === "GET") {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html")))
   );
 });
