@@ -1,0 +1,351 @@
+/* ============================================================================
+   TASTY VADAPAV — DESIGN TOKENS
+   Direction: a working street-food stall's signage and paperwork — hand-
+   painted signboard wordmark, ink-stamped status badges, ledger-paper data
+   tables. Not a generic dashboard template.
+   ============================================================================ */
+
+:root {
+  /* Color — spice-stall palette, not the generic cream+terracotta default */
+  --ink:            #241C14;   /* roasted-masala near-black, primary text   */
+  --ink-soft:       #4A4038;   /* secondary text                            */
+  --paper:          #EFE9DA;   /* besan-dough stone, app background         */
+  --paper-raised:   #FBF8F0;   /* card surfaces                             */
+  --paper-sunken:   #E4DCC7;   /* input backgrounds, table stripes          */
+  --border:         #D6CBAC;
+  --border-strong:  #B8AA80;
+
+  --turmeric:       #C6820B;   /* primary action / brand accent             */
+  --turmeric-ink:   #6B4405;   /* text on turmeric                          */
+  --chutney-green:  #3E6B33;   /* positive / settled / reconciled           */
+  --chutney-green-bg: #E4EDDF;
+  --chutney-red:    #8A2E1E;   /* negative / pending / shortage             */
+  --chutney-red-bg: #F3E3DE;
+  --steel:          #5C6B63;   /* muted secondary accent                    */
+
+  --shadow-card: 0 1px 0 rgba(36,28,20,0.06), 0 1px 3px rgba(36,28,20,0.05);
+
+  /* Type */
+  --font-display: ui-sans-serif, "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-body: ui-sans-serif, "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-data: ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  /* Scale */
+  --radius: 4px;
+  --radius-lg: 10px;
+  --gap: 16px;
+
+  --sidebar-w: 232px;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea { font-family: inherit; font-size: inherit; }
+
+a { color: inherit; }
+
+::selection { background: var(--turmeric); color: #fff; }
+
+/* Focus visibility — never remove this */
+:focus-visible {
+  outline: 2px solid var(--turmeric);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* ============================================================================
+   SIGNBOARD HEADER — the signature element. A hand-painted stall sign band:
+   ink background, turmeric wordmark, tight uppercase tracking, hairline
+   underline like a painted rule. Used on the top bar (mobile) and sidebar
+   header (desktop).
+   ============================================================================ */
+
+.signboard {
+  background: var(--ink);
+  color: var(--turmeric);
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  border-bottom: 3px solid var(--turmeric);
+}
+.signboard .mark-1 { font-size: 1.05em; }
+.signboard .mark-2 { font-size: 1.05em; color: #F0C86B; }
+.signboard .tagline {
+  font-family: var(--font-body);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: #C9BFA6;
+  font-size: 0.7em;
+}
+
+/* ============================================================================
+   APP SHELL LAYOUT
+   ============================================================================ */
+
+#app-shell { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--paper-raised);
+  border-right: 1px solid var(--border);
+  display: none;
+  flex-direction: column;
+}
+.sidebar .signboard { padding: 18px 20px; flex-direction: column; align-items: flex-start; gap: 2px; }
+.sidebar .signboard .wordmark { font-size: 1.3rem; }
+
+.nav-group { padding: 14px 10px 4px; }
+.nav-group-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--steel);
+  padding: 4px 10px;
+}
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius);
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+.nav-link:hover { background: var(--paper-sunken); }
+.nav-link.active { background: var(--ink); color: var(--turmeric); font-weight: 600; }
+.nav-link .icon { width: 18px; text-align: center; opacity: 0.85; }
+
+.main-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+.topbar .signboard { flex: 1; padding: 8px 12px; border-radius: var(--radius); }
+
+.user-badge {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.85rem; color: var(--ink-soft);
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 5px 12px; background: var(--paper-raised);
+}
+.role-pill {
+  font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; padding: 2px 7px; border-radius: 999px;
+  background: var(--turmeric); color: #fff;
+}
+
+main#screen {
+  flex: 1;
+  padding: 16px;
+  padding-bottom: 84px; /* clear bottom nav on mobile */
+  max-width: 1080px;
+  width: 100%;
+}
+
+@media (min-width: 900px) {
+  .sidebar { display: flex; }
+  .topbar { display: none; }
+  main#screen { padding: 28px 32px; padding-bottom: 32px; }
+}
+
+/* ============================================================================
+   BOTTOM NAV (mobile)
+   ============================================================================ */
+
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  display: flex; background: var(--paper-raised);
+  border-top: 1px solid var(--border);
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  z-index: 20;
+}
+@media (min-width: 900px) { .bottom-nav { display: none; } }
+.bottom-nav .nav-link {
+  flex: 1; flex-direction: column; gap: 2px; font-size: 0.68rem;
+  text-align: center; padding: 6px 2px; border-radius: var(--radius);
+}
+.bottom-nav .nav-link .icon { font-size: 1.15rem; }
+.bottom-nav .nav-link.active { background: transparent; color: var(--turmeric-ink); }
+
+/* ============================================================================
+   CARDS / DASHBOARD
+   ============================================================================ */
+
+.card {
+  background: var(--paper-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px;
+}
+.card + .card { margin-top: var(--gap); }
+
+.card-title {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--steel); margin: 0 0 12px;
+}
+
+.grid { display: grid; gap: var(--gap); }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 640px) { .grid-2, .grid-3 { grid-template-columns: 1fr 1fr; } }
+
+.stat-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 7px 0; border-bottom: 1px dashed var(--border);
+}
+.stat-row:last-child { border-bottom: none; }
+.stat-label { color: var(--ink-soft); font-size: 0.88rem; }
+.stat-value {
+  font-family: var(--font-data); font-variant-numeric: tabular-nums;
+  font-weight: 600; font-size: 0.98rem;
+}
+.stat-value.positive { color: var(--chutney-green); }
+.stat-value.negative { color: var(--chutney-red); }
+
+/* ============================================================================
+   STAMP BADGES — the signature status device: rendered like an ink stamp on
+   a receipt. Used for Collected / Pending / Settled / Paid / Reconciled.
+   ============================================================================ */
+
+.stamp {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-display); font-weight: 800;
+  font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 3px 9px 2px; border: 1.5px solid currentColor; border-radius: 3px;
+  transform: rotate(-2deg);
+}
+.stamp.settled, .stamp.paid, .stamp.reconciled { color: var(--chutney-green); background: var(--chutney-green-bg); }
+.stamp.pending, .stamp.unpaid { color: var(--chutney-red); background: var(--chutney-red-bg); }
+.stamp.collected { color: var(--turmeric-ink); background: #F5E6C4; }
+
+/* ============================================================================
+   TABLES
+   ============================================================================ */
+
+table.ledger { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+table.ledger th {
+  text-align: left; font-size: 0.68rem; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--steel);
+  border-bottom: 2px solid var(--border-strong); padding: 6px 10px;
+}
+table.ledger td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+table.ledger tr:nth-child(even) td { background: var(--paper-sunken); }
+table.ledger td.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; text-align: right; }
+
+/* ============================================================================
+   BUTTONS
+   ============================================================================ */
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 16px; border-radius: var(--radius);
+  border: 1px solid var(--border-strong); background: var(--paper-raised);
+  color: var(--ink); font-weight: 600; font-size: 0.9rem; cursor: pointer;
+}
+.btn:hover { background: var(--paper-sunken); }
+.btn-primary { background: var(--turmeric); border-color: var(--turmeric); color: #fff; }
+.btn-primary:hover { background: #B0740A; }
+.btn-danger { background: var(--chutney-red); border-color: var(--chutney-red); color: #fff; }
+
+.fab-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+
+/* ============================================================================
+   FORMS
+   ============================================================================ */
+
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 5px; color: var(--ink-soft); }
+.field input, .field select, .field textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--border-strong);
+  border-radius: var(--radius); background: var(--paper-sunken); color: var(--ink);
+}
+
+/* Phase 2 — Financial Engine */
+.screen-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.screen-head h1 { margin: 0 0 4px; font-size: 1.45rem; }
+.screen-head p, .muted { margin: 0; color: var(--ink-soft); font-size: 0.87rem; }
+.table-wrap { overflow-x: auto; }
+.btn-small { padding: 5px 9px; font-size: 0.76rem; }
+.negative { color: var(--chutney-red); }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 14px; }
+.field-wide { grid-column: 1 / -1; }
+.form-status { min-height: 1.25em; font-size: 0.84rem; margin-bottom: 8px; }
+.form-status.error { color: var(--chutney-red); }
+.form-status.success { color: var(--chutney-green); }
+.modal-backdrop { position: fixed; inset: 0; z-index: 50; padding: 20px; background: rgba(36,28,20,.5); display: flex; align-items: center; justify-content: center; }
+.modal-card { position: relative; max-width: 780px; width: 100%; max-height: 90vh; overflow: auto; padding: 22px; border-radius: var(--radius-lg); border: 1px solid var(--border-strong); background: var(--paper-raised); box-shadow: 0 12px 38px rgba(0,0,0,.24); }
+.modal-card h2 { margin-top: 0; }
+.modal-close { position: absolute; top: 8px; right: 10px; border: 0; background: transparent; color: var(--ink-soft); font-size: 1.7rem; cursor: pointer; line-height: 1; }
+details summary { cursor: pointer; color: var(--turmeric-ink); font-weight: 600; }
+details pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 340px; font-size: .7rem; color: var(--ink-soft); }
+small { color: var(--steel); }
+@media (max-width: 640px) { .screen-head { display: block; } .screen-head .btn { margin-top: 10px; } .form-grid { grid-template-columns: 1fr; } }
+
+/* ============================================================================
+   EMPTY / PLACEHOLDER STATES
+   ============================================================================ */
+
+.placeholder-screen {
+  border: 1px dashed var(--border-strong); border-radius: var(--radius-lg);
+  padding: 40px 24px; text-align: center; color: var(--ink-soft);
+}
+.placeholder-screen h2 { color: var(--ink); margin-top: 0; }
+.placeholder-screen .phase-tag {
+  display: inline-block; font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--turmeric-ink);
+  background: #F5E6C4; padding: 3px 10px; border-radius: 999px; margin-bottom: 10px;
+}
+
+/* ============================================================================
+   LOGIN SCREEN
+   ============================================================================ */
+
+#login-screen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 20px; background: var(--paper);
+}
+.login-card {
+  width: 100%; max-width: 360px; background: var(--paper-raised);
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card); overflow: hidden;
+}
+.login-card .signboard { padding: 22px 20px; flex-direction: column; align-items: flex-start; gap: 2px; }
+.login-card .signboard .wordmark { font-size: 1.4rem; }
+.login-body { padding: 20px 22px 24px; }
+.login-error { color: var(--chutney-red); font-size: 0.85rem; margin-top: 8px; min-height: 1.2em; }
+
+.hidden { display: none !important; }
+.offline-banner {
+  background: var(--chutney-red-bg); color: var(--chutney-red);
+  font-size: 0.8rem; font-weight: 600; text-align: center; padding: 6px;
+}
+.sync-banner {
+  background: #F5E6C4; color: var(--turmeric-ink);
+  font-size: 0.8rem; font-weight: 600; text-align: center; padding: 6px;
+}
