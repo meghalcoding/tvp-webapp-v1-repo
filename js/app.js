@@ -5,6 +5,7 @@ import { getPendingCount, syncOutbox } from "./offline-queue.js";
 import { renderAccountsScreen, renderTransfersScreen, renderLedgerScreen, renderAuditLogScreen } from "./financial-engine.js";
 import { renderSalesScreen, renderExpensesScreen, renderUpiScreen, renderDailyClosingScreen } from "./daily-operations.js";
 import { renderPurchasesScreen, renderInventoryScreen, renderWastageScreen, renderSupplierDuesScreen } from "./procurement-inventory.js";
+import { renderDailyReport, renderSalesReport, renderPurchaseReport, renderExpenseReport, renderStockReport, renderPlReport, renderGstReport, renderUpiReport, renderSupplierReport, dashboardToday } from "./reporting.js";
 
 // ============================================================================
 // NAV TREE — exactly the structure in spec §15
@@ -37,13 +38,15 @@ const NAV = [
   {
     group: "Reports",
     items: [
-      { path: "report-daily", label: "Daily Report", icon: "▤", phase: "Phase 5 — Reporting" },
-      { path: "report-sales", label: "Sales Report", icon: "▤", phase: "Phase 5 — Reporting" },
-      { path: "report-purchase", label: "Purchase Report", icon: "▤", phase: "Phase 5 — Reporting" },
-      { path: "report-expense", label: "Expense Report", icon: "▤", phase: "Phase 5 — Reporting" },
-      { path: "report-stock", label: "Stock Report", icon: "▤", phase: "Phase 5 — Reporting" },
-      { path: "report-pl", label: "P&L", icon: "▤", phase: "Phase 5 — Reporting" },
-      { path: "report-gst", label: "GST Summary", icon: "▤", phase: "Phase 5 — Reporting" },
+      { path: "report-daily", label: "Daily Report", icon: "▤" },
+      { path: "report-sales", label: "Sales Report", icon: "▤" },
+      { path: "report-purchase", label: "Purchase Report", icon: "▤" },
+      { path: "report-expense", label: "Expense Report", icon: "▤" },
+      { path: "report-stock", label: "Stock Report", icon: "▤" },
+      { path: "report-pl", label: "P&L", icon: "▤" },
+      { path: "report-gst", label: "GST Summary", icon: "▤" },
+      { path: "report-upi", label: "UPI Report", icon: "▤" },
+      { path: "report-suppliers", label: "Supplier Balances", icon: "▤" },
     ],
   },
   {
@@ -215,6 +218,15 @@ async function renderRoute() {
     "supplier-dues": (target) => renderSupplierDuesScreen(target, currentAppUser),
     "master-items": (target) => renderInventoryScreen(target, currentAppUser),
     "master-suppliers": (target) => renderSupplierDuesScreen(target, currentAppUser),
+    "report-daily": renderDailyReport,
+    "report-sales": renderSalesReport,
+    "report-purchase": renderPurchaseReport,
+    "report-expense": renderExpenseReport,
+    "report-stock": renderStockReport,
+    "report-pl": renderPlReport,
+    "report-gst": renderGstReport,
+    "report-upi": renderUpiReport,
+    "report-suppliers": renderSupplierReport,
   };
 
   if (renderers[path]) {
@@ -277,9 +289,17 @@ async function renderDashboard(screen) {
   const bank = accounts?.find((a) => a.name === "Cravory Bank");
   const upiPendingTotal = (upi || []).reduce((s, r) => s + Number(r.pending || 0), 0);
   const lowStock = (stock || []).filter((s) => Number(s.quantity) <= Number(s.reorder_level));
+  const todayStats = await dashboardToday();
 
   screen.innerHTML = `
     <div class="grid grid-2">
+      <div class="card">
+        <div class="card-title">Today</div>
+        <div class="stat-row"><span class="stat-label">Sales</span><span class="stat-value positive">₹${fmt(todayStats?.sales)}</span></div>
+        <div class="stat-row"><span class="stat-label">Expenses</span><span class="stat-value negative">₹${fmt(todayStats?.expenses)}</span></div>
+        <div class="stat-row"><span class="stat-label">Purchases</span><span class="stat-value">₹${fmt(todayStats?.purchases)}</span></div>
+        <div class="stat-row"><span class="stat-label">Wastage</span><span class="stat-value negative">₹${fmt(todayStats?.wastage)}</span></div>
+      </div>
       <div class="card">
         <div class="card-title">Cash Position</div>
         <div class="stat-row"><span class="stat-label">Cash Drawer</span><span class="stat-value">₹${fmt(cash?.balance)}</span></div>
