@@ -416,3 +416,103 @@ small { color: var(--steel); }
   background: #F5E6C4; color: var(--turmeric-ink);
   font-size: 0.8rem; font-weight: 600; text-align: center; padding: 6px;
 }
+
+/* Progressive transaction history controls */
+.history-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 10px 0 2px;
+}
+.history-controls .history-count,
+.history-controls .history-end,
+.history-controls .history-loading {
+  color: var(--muted, #6f6a61);
+  font-size: 0.78rem;
+}
+.history-controls .history-end {
+  font-style: italic;
+}
+.history-controls .form-status.error {
+  margin: 0;
+}
+
+/* Phase 2 — master-rate purchase controls */
+.rate-wrap { position: relative; min-width: 0; }
+.rate-wrap input { width: 100%; padding-right: 86px; }
+.rate-wrap input[data-locked="true"] { background: var(--paper-sunken); cursor: default; }
+.rate-modify { position: absolute; right: 4px; top: 4px; min-height: 30px; padding: 3px 7px; font-size: .68rem; }
+.rate-warning { display: block; margin-top: 3px; color: var(--chutney-red); font-size: .68rem; font-weight: 700; }
+.rate-warning.hidden { display: none; }
+@media (max-width: 740px) { .rate-wrap { min-width: 0; } }
+
+.gst-wrap { position: relative; min-width: 0; }
+.gst-wrap input { width: 100%; padding-right: 86px; }
+.gst-wrap input[data-locked="true"] { background: var(--paper-sunken); cursor: default; }
+.gst-modify { position: absolute; right: 4px; top: 4px; min-height: 30px; padding: 3px 7px; font-size: .68rem; }
+
+/* Phase 2 rate/GST controls: visibly editable after Modify is pressed. */
+.rate-wrap input.is-editable,
+.gst-wrap input.is-editable {
+  background: var(--paper, #fff);
+  cursor: text;
+}
+
+/* Phase 3 — Tasty Vadapav franchise-owner purchase workflow */
+.franchise-order-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--paper-sunken);
+  font-size: .82rem;
+}
+.franchise-order-banner strong { text-transform: uppercase; letter-spacing: .04em; }
+.franchise-order-banner span { color: var(--ink-soft); }
+.franchise-template-row {
+  display: grid;
+  grid-template-columns: minmax(150px,2fr) 70px minmax(80px,1fr) minmax(150px,1.3fr) minmax(150px,1.3fr) 90px 90px minmax(120px,1fr);
+  gap: 7px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.franchise-item-name { display: flex; flex-direction: column; min-width: 0; }
+.franchise-item-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.franchise-item-name small { color: var(--ink-soft); font-family: var(--font-data); min-height: 1em; }
+.franchise-unit { color: var(--ink-soft); font-size: .78rem; }
+.franchise-template-row [data-qty] { width: 100%; padding: 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--paper-sunken); }
+.franchise-template-row output { font-family: var(--font-data); font-size: .78rem; text-align: right; white-space: nowrap; }
+.template-map { width: 100%; padding: 7px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--paper-sunken); }
+.template-unmapped { color: var(--chutney-red); font-size: .72rem; font-weight: 700; }
+.franchise-order-summary {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+}
+.franchise-order-summary > strong { display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; font-size: .78rem; }
+.franchise-order-summary > div { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; font-size: .82rem; }
+.franchise-order-summary.muted { color: var(--ink-soft); }
+@media (max-width: 980px) {
+  .franchise-template-row { grid-template-columns: 1.6fr 60px 90px 1fr 1fr 75px 75px; }
+  .franchise-template-row .template-map,
+  .franchise-template-row .template-unmapped { grid-column: 1 / -1; }
+}
+@media (max-width: 740px) {
+  .franchise-order-banner { align-items: flex-start; flex-direction: column; }
+  .franchise-template-row { grid-template-columns: 1fr 1fr; }
+  .franchise-item-name { grid-column: 1 / -1; }
+  .franchise-template-row .rate-wrap,
+  .franchise-template-row .gst-wrap { min-width: 0; }
+  .franchise-template-row output { text-align: left; }
+  .franchise-template-row .template-map,
+  .franchise-template-row .template-unmapped { grid-column: 1 / -1; }
+}

@@ -4,7 +4,7 @@ import { exportFullBackup, exportModuleBackups } from "./backup.js";
 import { getPendingCount, syncOutbox } from "./offline-queue.js";
 import { renderAccountsScreen, renderTransfersScreen, renderLedgerScreen, renderAuditLogScreen } from "./financial-engine.js";
 import { renderSalesScreen, renderExpensesScreen, renderUpiScreen, renderDailyClosingScreen } from "./daily-operations.js";
-import { renderPurchasesScreen, renderInventoryScreen, renderWastageScreen, renderSupplierDuesScreen } from "./procurement-inventory.js";
+import { renderPurchasesScreen, renderInventoryScreen, renderItemMasterScreen, renderWastageScreen, renderSupplierDuesScreen, renderSupplierMasterScreen } from "./procurement-inventory.js";
 import { renderDailyReport, renderSalesReport, renderPurchaseReport, renderExpenseReport, renderStockReport, renderPlReport, renderGstReport, renderUpiReport, renderSupplierReport, dashboardToday } from "./reporting.js";
 import { renderExpenseCategoriesScreen, renderUsersScreen, renderAutomationScreen } from "./automation.js";
 
@@ -82,14 +82,33 @@ async function boot() {
   wireLoginForm();
   wireOnlineOfflineBanners();
 
-  const session = await getSession();
-  if (session) await enterApp();
-  else showLogin();
-
-  onAuthStateChange(async (session) => {
+  try {
+    const session = await getSession();
     if (session) await enterApp();
     else showLogin();
-  });
+
+    onAuthStateChange(async (session) => {
+      try {
+        if (session) await enterApp();
+        else showLogin();
+      } catch (error) {
+        console.error("Auth state handling failed:", error);
+        showAuthError(error);
+      }
+    });
+  } catch (error) {
+    console.error("Application bootstrap failed:", error);
+    showAuthError(error);
+  }
+}
+
+function showAuthError(error) {
+  const el = document.getElementById("login-error");
+  if (!el) return;
+  const message = error?.message || error?.error_description || String(error || "Unknown error");
+  el.textContent = `Unable to initialize your account session: ${message}`;
+  document.getElementById("login-screen")?.classList.remove("hidden");
+  document.getElementById("app-shell")?.classList.add("hidden");
 }
 
 function showLogin() {
@@ -130,7 +149,8 @@ function wireLoginForm() {
     try {
       await signIn(email, password);
     } catch (err) {
-      errEl.textContent = err.message || "Sign-in failed.";
+      console.error("Sign-in failed:", err);
+      errEl.textContent = err.message || err.error_description || "Sign-in failed.";
     }
   });
 }
@@ -218,8 +238,8 @@ async function renderRoute() {
     inventory: (target) => renderInventoryScreen(target, currentAppUser),
     wastage: (target) => renderWastageScreen(target, currentAppUser),
     "supplier-dues": (target) => renderSupplierDuesScreen(target, currentAppUser),
-    "master-items": (target) => renderInventoryScreen(target, currentAppUser),
-    "master-suppliers": (target) => renderSupplierDuesScreen(target, currentAppUser),
+    "master-items": (target) => renderItemMasterScreen(target, currentAppUser),
+    "master-suppliers": (target) => renderSupplierMasterScreen(target, currentAppUser),
     "master-categories": (target) => renderExpenseCategoriesScreen(target, currentAppUser),
     "master-users": (target) => renderUsersScreen(target, currentAppUser),
     automation: (target) => renderAutomationScreen(target, currentAppUser),

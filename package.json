@@ -1,0 +1,16 @@
+{
+  "name": "tasty-vadapav-control-center",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local development and validation tooling for the Tasty Vadapav Control Center.",
+  "type": "module",
+  "scripts": {
+    "dev": "node tools/dev-server.mjs",
+    "start": "node tools/dev-server.mjs",
+    "check": "node tools/check.mjs",
+    "serve": "node tools/dev-server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
