@@ -24,17 +24,167 @@ function accountOptions(rows, type = null) { return rows.filter((a) => !type || 
 
 export async function renderSalesScreen(screen, user) {
   if (!IS_CONFIGURED) { screen.innerHTML = noConfig(); return; }
+
   const { accounts } = await masters();
-  const sales = await fetchTransactionPage({ type: "sale", select: "id,txn_date,amount,description,created_at,sale_details(payment_method,collection_account_id)", limit: HISTORY_INITIAL_LIMIT });
+  const sales = await fetchTransactionPage({
+    type: "sale",
+    select: "id,txn_date,amount,description,created_at,sale_details(payment_method,collection_account_id,sales_channel,external_order_id)",
+    limit: HISTORY_INITIAL_LIMIT,
+  });
+
   const names = new Map(accounts.map((a) => [a.id, a.name]));
   const allowed = canDo(user, "record_sale");
-  screen.innerHTML = `<div class="screen-head"><div><h1>Sales</h1><p>Cash sales go to Cash Drawer. UPI sales are collected immediately into their selected account.</p></div></div>
-  ${allowed ? `<div class="card"><div class="card-title">New sale</div><form id="sale-form" class="form-grid"><div class="field"><label>Amount</label><input name="amount" type="number" min="0.01" step="0.01" required autofocus /></div><div class="field"><label>Date</label><input name="txn_date" type="date" value="${today()}" required /></div><div class="field"><label>Payment method</label><select name="payment_method" id="sale-payment"><option value="cash">Cash — Cash Drawer</option><option value="upi">UPI — Collection account</option></select></div><div class="field hidden" id="sale-collection"><label>Collection account</label><select name="collection_account_id"><option value="">Choose account</option>${accountOptions(accounts, ["collection_account"])}</select></div><div class="field field-wide"><label>Note (optional)</label><input name="description" maxlength="500" placeholder="Optional sale note" /></div><div class="field field-wide"><div class="form-status"></div><button class="btn btn-primary">Record sale</button></div></form></div>` : ""}
-  <div class="card table-wrap"><div class="card-title">Recent sales</div><table class="ledger"><thead><tr><th>Date</th><th>Payment</th><th>Collection account</th><th>Note</th><th class="num">Amount</th></tr></thead><tbody id="sales-history-body"></tbody></table><div class="history-controls" id="sales-history-controls"></div></div>`;
-  createHistoryController({ tbody: screen.querySelector("#sales-history-body"), controls: screen.querySelector("#sales-history-controls"), type: "sale", select: "id,txn_date,amount,description,created_at,sale_details(payment_method,collection_account_id)", initialRows: sales, colspan: 5, renderRow: (s) => { const detail = Array.isArray(s.sale_details) ? s.sale_details[0] : s.sale_details; return `<tr><td>${esc(s.txn_date)}</td><td><span class="stamp ${detail?.payment_method === "upi" ? "collected" : "settled"}">${esc(detail?.payment_method || "—")}</span></td><td>${detail?.payment_method === "upi" ? esc(names.get(detail.collection_account_id) || "—") : "Cash Drawer"}</td><td>${esc(s.description || "—")}</td><td class="num">${money(s.amount)}</td></tr>`; } });
-  const method = screen.querySelector("#sale-payment"); const collection = screen.querySelector("#sale-collection");
-  method?.addEventListener("change", () => collection.classList.toggle("hidden", method.value !== "upi"));
-  screen.querySelector("#sale-form")?.addEventListener("submit", async (event) => { event.preventDefault(); const form = new FormData(event.currentTarget); const feedback = event.currentTarget.querySelector(".form-status"); if (form.get("payment_method") === "upi" && !form.get("collection_account_id")) { status(feedback, "Choose a collection account for this UPI sale.", true); return; } const payload={p_client_uuid:crypto.randomUUID(),p_amount:Number(form.get("amount")),p_payment_method:form.get("payment_method"),p_collection_account_id:form.get("collection_account_id")||null,p_txn_date:form.get("txn_date"),p_description:form.get("description").trim()||null}; status(feedback,navigator.onLine?"Recording sale…":"Sale queued for sync."); try { await postOutboxSafe("sale",payload,"create_sale_idempotent"); } catch(err) { status(feedback,err.message,true); return; } if (!navigator.onLine) return; await renderSalesScreen(screen, user); });
+  const collectionAccounts = accounts.filter((a) => a.type === "collection_account");
+  const zomatoAccount = collectionAccounts.find((a) => a.name === "Zomato Collections");
+  const swiggyAccount = collectionAccounts.find((a) => a.name === "Swiggy Collections");
+
+  screen.innerHTML = `<div class="screen-head"><div>
+    <h1>Sales</h1>
+    <p>Walk-in sales use Cash or UPI. Zomato and Swiggy sales are recorded into their platform collection accounts for later settlement.</p>
+  </div></div>
+  ${allowed ? `<div class="card"><div class="card-title">New sale</div>
+    <form id="sale-form" class="form-grid">
+      <div class="field">
+        <label>Sales channel</label>
+        <select name="sales_channel" id="sale-channel" required>
+          <option value="walk_in">Walk-in</option>
+          <option value="zomato">Zomato</option>
+          <option value="swiggy">Swiggy</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Payment / collection</label>
+        <select name="payment_method" id="sale-payment" required>
+          <option value="cash">Cash — Cash Drawer</option>
+          <option value="upi">UPI — Collection account</option>
+        </select>
+      </div>
+      <div class="field hidden" id="sale-collection">
+        <label>Collection account</label>
+        <select name="collection_account_id" id="sale-collection-account">
+          <option value="">Choose account</option>
+          ${accountOptions(collectionAccounts)}
+        </select>
+      </div>
+      <div class="field">
+        <label>Amount</label>
+        <input name="amount" type="number" min="0.01" step="0.01" required />
+      </div>
+      <div class="field">
+        <label>Date</label>
+        <input name="txn_date" type="date" value="${today()}" required />
+      </div>
+      <div class="field field-wide">
+        <label>Note (optional)</label>
+        <input name="description" maxlength="500" placeholder="Optional sale note" />
+      </div>
+      <div class="field field-wide">
+        <div class="form-status"></div>
+        <button class="btn btn-primary">Record sale</button>
+      </div>
+    </form>
+  </div>` : ""}
+  <div class="card table-wrap"><div class="card-title">Recent sales</div>
+    <table class="ledger">
+      <thead><tr>
+        <th>Date</th><th>Channel</th><th>Payment / collection</th>
+        <th>Collection account</th><th>Note</th><th class="num">Amount</th>
+      </tr></thead>
+      <tbody id="sales-history-body"></tbody>
+    </table>
+    <div class="history-controls" id="sales-history-controls"></div>
+  </div>`;
+
+  createHistoryController({
+    tbody: screen.querySelector("#sales-history-body"),
+    controls: screen.querySelector("#sales-history-controls"),
+    type: "sale",
+    select: "id,txn_date,amount,description,created_at,sale_details(payment_method,collection_account_id,sales_channel,external_order_id)",
+    initialRows: sales,
+    colspan: 6,
+    renderRow: (s) => {
+      const detail = Array.isArray(s.sale_details) ? s.sale_details[0] : s.sale_details;
+      const channel = detail?.sales_channel || "walk_in";
+      const payment = detail?.payment_method || "—";
+      const accountName = detail?.collection_account_id
+        ? (names.get(detail.collection_account_id) || "—")
+        : channel === "walk_in" && payment === "cash" ? "Cash Drawer" : "—";
+      return `<tr>
+        <td>${esc(s.txn_date)}</td>
+        <td><span class="stamp">${esc(channel === "walk_in" ? "Walk-in" : channel)}</span></td>
+        <td>${esc(payment)}</td>
+        <td>${esc(accountName)}</td>
+        <td>${esc(s.description || "—")}</td>
+        <td class="num">${money(s.amount)}</td>
+      </tr>`;
+    },
+  });
+
+  const channel = screen.querySelector("#sale-channel");
+  const method = screen.querySelector("#sale-payment");
+  const collection = screen.querySelector("#sale-collection");
+  const collectionSelect = screen.querySelector("#sale-collection-account");
+
+  function configureSaleFields() {
+    const value = channel.value;
+
+    if (value === "walk_in") {
+      method.innerHTML = `
+        <option value="cash">Cash — Cash Drawer</option>
+        <option value="upi">UPI — Collection account</option>`;
+      collection.classList.toggle("hidden", method.value !== "upi");
+      collectionSelect.value = "";
+      return;
+    }
+
+    method.innerHTML = `<option value="marketplace">${value === "zomato" ? "Zomato" : "Swiggy"} — Marketplace collection</option>`;
+    collection.classList.remove("hidden");
+    const preferred = value === "zomato" ? zomatoAccount : swiggyAccount;
+    collectionSelect.value = preferred?.id || "";
+  }
+
+  channel?.addEventListener("change", configureSaleFields);
+  method?.addEventListener("change", () => {
+    collection.classList.toggle("hidden", method.value === "cash");
+  });
+  configureSaleFields();
+
+  screen.querySelector("#sale-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const form = new FormData(event.currentTarget);
+    const feedback = event.currentTarget.querySelector(".form-status");
+    const salesChannel = form.get("sales_channel");
+    const paymentMethod = form.get("payment_method");
+    const collectionAccountId = form.get("collection_account_id") || null;
+
+    if (paymentMethod !== "cash" && !collectionAccountId) {
+      status(feedback, "Choose a collection account.", true);
+      return;
+    }
+
+    const payload = {
+      p_client_uuid: crypto.randomUUID(),
+      p_amount: Number(form.get("amount")),
+      p_payment_method: paymentMethod,
+      p_collection_account_id: collectionAccountId,
+      p_txn_date: form.get("txn_date"),
+      p_description: form.get("description").trim() || null,
+      p_sales_channel: salesChannel,
+    };
+
+    status(feedback, navigator.onLine ? "Recording sale…" : "Sale queued for sync.");
+
+    try {
+      await postOutboxSafe("sale", payload, "create_sale_idempotent");
+    } catch (err) {
+      status(feedback, err.message, true);
+      return;
+    }
+
+    if (!navigator.onLine) return;
+    await renderSalesScreen(screen, user);
+  });
 }
 
 export async function renderExpensesScreen(screen, user) {
