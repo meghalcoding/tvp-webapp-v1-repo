@@ -9,6 +9,7 @@ import { renderDailyReport, renderSalesReport, renderPurchaseReport, renderExpen
 import { renderExpenseCategoriesScreen, renderUsersScreen, renderAutomationScreen } from "./automation.js";
 import { renderDocumentsScreen } from "./documents.js";
 import { renderMarketplaceImportScreen } from "./marketplace-imports.js";
+import { renderBudgetScreen } from "./budget.js";
 
 // ============================================================================
 // NAV TREE — exactly the structure in spec §15
@@ -22,6 +23,7 @@ const NAV = [
     items: [
       { path: "sales", label: "Sales", icon: "₹" },
       { path: "marketplace-imports", label: "Marketplace Imports", icon: "⇩" },
+      { path: "budget", label: "Budget & Forecasting", icon: "◫" },
       { path: "purchases", label: "Purchases", icon: "▤" },
       { path: "expenses", label: "Expenses", icon: "✎" },
       { path: "inventory", label: "Inventory", icon: "▦" },
@@ -243,6 +245,7 @@ async function renderRoute() {
     "audit-log": (target) => renderAuditLogScreen(target, currentAppUser),
     sales: (target) => renderSalesScreen(target, currentAppUser),
     "marketplace-imports": (target) => renderMarketplaceImportScreen(target, currentAppUser),
+    budget: (target) => renderBudgetScreen(target, currentAppUser),
     expenses: (target) => renderExpensesScreen(target, currentAppUser),
     upi: (target) => renderUpiScreen(target, currentAppUser),
     "daily-closing": (target) => renderDailyClosingScreen(target, currentAppUser),
