@@ -79,7 +79,13 @@ export async function uploadDocument({ file, documentType = "other", supplierId 
       p_notes: notes?.trim() || null,
       p_transaction_ids: [...new Set(transactionIds.filter(Boolean))],
     });
-    if (documentError) throw documentError;
+    if (documentError) {
+      const message = String(documentError.message || documentError.details || documentError);
+      if (/Could not find the function public\.create_financial_document/i.test(message) || /schema cache/i.test(message)) {
+        throw new Error('The document-upload RPC is not loaded in Supabase yet. Run db/phase4a_document_rpc_hotfix.sql in the Supabase SQL Editor, then refresh this page.');
+      }
+      throw documentError;
+    }
     return document;
   } catch (error) {
     await supabase.storage.from(DOCUMENT_BUCKET).remove([storagePath]);
