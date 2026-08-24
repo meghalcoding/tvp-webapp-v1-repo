@@ -89,3 +89,8 @@ and manually verify:
 6. Existing sales history still loads.
 
 Do not add service-role keys or other secrets to the repository.
+
+
+## Phase 5B
+
+Run `db/phase5b_marketplace_imports.sql` after Phase 5A. It adds the marketplace import staging layer and extends the dedicated reconciliation screen to settle Zomato/Swiggy collection accounts.

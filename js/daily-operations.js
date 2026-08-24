@@ -41,7 +41,7 @@ export async function renderSalesScreen(screen, user) {
   screen.innerHTML = `<div class="screen-head"><div>
     <h1>Sales</h1>
     <p>Walk-in sales use Cash or UPI. Zomato and Swiggy sales are recorded into their platform collection accounts for later settlement.</p>
-  </div></div>
+  </div><div class="screen-actions"><a class="btn" href="#/marketplace-imports">Import Zomato / Swiggy</a></div></div>
   ${allowed ? `<div class="card"><div class="card-title">New sale</div>
     <form id="sale-form" class="form-grid">
       <div class="field">
@@ -270,12 +270,68 @@ export async function renderExpensesScreen(screen, user) {
 
 export async function renderUpiScreen(screen, user) {
   if (!IS_CONFIGURED) { screen.innerHTML = noConfig(); return; }
-  const { accounts } = await masters(); const { data, error } = await supabase.from("upi_reconciliation").select("*").order("name"); if (error) throw error;
+
+  const { accounts } = await masters();
+  const { data, error } = await supabase.from("upi_reconciliation").select("*").order("name");
+  if (error) throw error;
+
   const allowed = canDo(user, "mark_settlement");
-  screen.innerHTML = `<div class="screen-head"><div><h1>UPI Reconciliation</h1><p>UPI sales are collected—not customer receivables. Settle them when funds reach Cash or Bank.</p></div></div><div class="card table-wrap"><table class="ledger"><thead><tr><th>Collection account</th><th class="num">Collected sales</th><th class="num">Settled</th><th class="num">Pending</th><th></th></tr></thead><tbody>${(data || []).map((r) => `<tr><td>${esc(r.name)}</td><td class="num">${money(r.sales)}</td><td class="num">${money(r.settled)}</td><td class="num ${Number(r.pending) > 0 ? "negative" : ""}">${money(r.pending)}</td><td>${allowed && Number(r.pending) > 0 ? `<button class="btn btn-small settle-upi" data-id="${r.account_id}" data-name="${esc(r.name)}" data-pending="${r.pending}">Mark settlement</button>` : '<span class="stamp settled">Settled</span>'}</td></tr>`).join("") || '<tr><td colspan="5">No collection accounts yet.</td></tr>'}</tbody></table></div><div id="upi-modal"></div>`;
-  screen.querySelectorAll(".settle-upi").forEach((button) => button.addEventListener("click", () => settlementForm(screen, user, accounts, button.dataset)));
+  const platformName = (name) => name === "Zomato Collections" ? "Zomato" : name === "Swiggy Collections" ? "Swiggy" : "UPI";
+
+  screen.innerHTML = `<div class="screen-head"><div>
+    <h1>UPI & Marketplace Reconciliation</h1>
+    <p>Settle UPI, Zomato and Swiggy collection accounts when funds reach Cash or Bank.</p>
+  </div><div class="screen-actions"><a class="btn" href="#/marketplace-imports">Import Zomato / Swiggy</a></div></div>
+  <div class="card table-wrap"><table class="ledger"><thead><tr>
+    <th>Collection account</th><th>Channel</th><th class="num">Collected</th><th class="num">Settled</th><th class="num">Pending</th><th></th>
+  </tr></thead><tbody>${(data || []).map((r) => `<tr>
+    <td>${esc(r.name)}</td>
+    <td><span class="stamp">${platformName(r.name)}</span></td>
+    <td class="num">${money(r.sales)}</td>
+    <td class="num">${money(r.settled)}</td>
+    <td class="num ${Number(r.pending) > 0 ? "negative" : ""}">${money(r.pending)}</td>
+    <td>${allowed && Number(r.pending) > 0
+      ? `<button class="btn btn-small settle-upi" data-id="${r.account_id}" data-name="${esc(r.name)}" data-pending="${r.pending}">Mark settlement</button>`
+      : Number(r.pending) <= 0 && Number(r.sales) > 0
+        ? '<span class="stamp settled">Settled</span>'
+        : '<span class="muted">—</span>'}</td>
+  </tr>`).join("") || '<tr><td colspan="6">No collection accounts yet.</td></tr>'}</tbody></table></div><div id="upi-modal"></div>`;
+
+  screen.querySelectorAll(".settle-upi").forEach((button) =>
+    button.addEventListener("click", () => settlementForm(screen, user, accounts, button.dataset))
+  );
 }
-function settlementForm(screen, user, accounts, data) { const mount = screen.querySelector("#upi-modal"); mount.innerHTML = `<div class="modal-backdrop"><form class="modal-card" id="settlement-form"><button type="button" class="modal-close">×</button><h2>Settle ${data.name}</h2><p class="muted">Pending collected amount: <strong>${money(data.pending)}</strong></p><div class="field"><label>Move to</label><select name="to" required>${accountOptions(accounts,["cash","bank"])}</select></div><div class="field"><label>Amount</label><input name="amount" type="number" min="0.01" max="${data.pending}" step="0.01" value="${Number(data.pending)}" required /></div><div class="field"><label>Date</label><input name="txn_date" type="date" value="${today()}" required /></div><div class="field"><label>Note (optional)</label><input name="description" maxlength="500" /></div><div class="form-status"></div><button class="btn btn-primary">Record settlement</button></form></div>`; mount.querySelector(".modal-close").addEventListener("click", () => mount.innerHTML = ""); mount.querySelector("form").addEventListener("submit", async (e) => { e.preventDefault(); const form = new FormData(e.currentTarget); const feedback=e.currentTarget.querySelector(".form-status"); status(feedback,"Recording settlement…"); const {error}=await supabase.rpc("create_upi_settlement",{p_collection_account_id:data.id,p_settled_to_account_id:form.get("to"),p_amount:Number(form.get("amount")),p_txn_date:form.get("txn_date"),p_description:form.get("description").trim()||null}); if(error){status(feedback,error.message,true);return;} await renderUpiScreen(screen,user); }); }
+
+function settlementForm(screen, user, accounts, data) {
+  const mount = screen.querySelector("#upi-modal");
+  mount.innerHTML = `<div class="modal-backdrop"><form class="modal-card" id="settlement-form">
+    <button type="button" class="modal-close">×</button>
+    <h2>Settle ${data.name}</h2>
+    <p class="muted">Pending collected amount: <strong>${money(data.pending)}</strong></p>
+    <div class="field"><label>Move to</label><select name="to" required>${accountOptions(accounts,["cash","bank"])}</select></div>
+    <div class="field"><label>Amount</label><input name="amount" type="number" min="0.01" max="${data.pending}" step="0.01" value="${Number(data.pending)}" required /></div>
+    <div class="field"><label>Date</label><input name="txn_date" type="date" value="${today()}" required /></div>
+    <div class="field"><label>Note (optional)</label><input name="description" maxlength="500" /></div>
+    <div class="form-status"></div><button class="btn btn-primary">Record settlement</button>
+  </form></div>`;
+
+  mount.querySelector(".modal-close").addEventListener("click", () => mount.innerHTML = "");
+  mount.querySelector("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const feedback=e.currentTarget.querySelector(".form-status");
+    status(feedback,"Recording settlement…");
+    const {error}=await supabase.rpc("create_upi_settlement",{
+      p_collection_account_id:data.id,
+      p_settled_to_account_id:form.get("to"),
+      p_amount:Number(form.get("amount")),
+      p_txn_date:form.get("txn_date"),
+      p_description:form.get("description").trim()||null
+    });
+    if(error){status(feedback,error.message,true);return;}
+    await renderUpiScreen(screen,user);
+  });
+}
 
 export async function renderDailyClosingScreen(screen, user) {
   if (!IS_CONFIGURED) { screen.innerHTML = noConfig(); return; }
