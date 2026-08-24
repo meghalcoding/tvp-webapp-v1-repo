@@ -7,6 +7,7 @@ import { renderSalesScreen, renderExpensesScreen, renderUpiScreen, renderDailyCl
 import { renderPurchasesScreen, renderInventoryScreen, renderItemMasterScreen, renderWastageScreen, renderSupplierDuesScreen, renderSupplierMasterScreen } from "./procurement-inventory.js";
 import { renderDailyReport, renderSalesReport, renderPurchaseReport, renderExpenseReport, renderStockReport, renderPlReport, renderGstReport, renderUpiReport, renderSupplierReport, dashboardToday } from "./reporting.js";
 import { renderExpenseCategoriesScreen, renderUsersScreen, renderAutomationScreen } from "./automation.js";
+import { renderDocumentsScreen } from "./documents.js";
 
 // ============================================================================
 // NAV TREE — exactly the structure in spec §15
@@ -34,6 +35,7 @@ const NAV = [
       { path: "upi", label: "UPI Reconciliation", icon: "⇄" },
       { path: "transfers", label: "Transfers", icon: "→" },
       { path: "supplier-dues", label: "Supplier Dues", icon: "⌘" },
+      { path: "documents", label: "Documents", icon: "▣" },
     ],
   },
   {
@@ -238,6 +240,7 @@ async function renderRoute() {
     inventory: (target) => renderInventoryScreen(target, currentAppUser),
     wastage: (target) => renderWastageScreen(target, currentAppUser),
     "supplier-dues": (target) => renderSupplierDuesScreen(target, currentAppUser),
+    documents: (target) => renderDocumentsScreen(target, currentAppUser),
     "master-items": (target) => renderItemMasterScreen(target, currentAppUser),
     "master-suppliers": (target) => renderSupplierMasterScreen(target, currentAppUser),
     "master-categories": (target) => renderExpenseCategoriesScreen(target, currentAppUser),

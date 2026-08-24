@@ -2,6 +2,7 @@ import { supabase, IS_CONFIGURED } from "./supabase-client.js";
 import { canDo } from "./auth.js";
 import { withOfflineFallback } from "./offline-queue.js";
 import { createHistoryController, fetchTransactionPage, HISTORY_INITIAL_LIMIT } from "./paginated-history.js";
+import { decorateDocumentCells, openDocumentModal, uploadDocument } from "./documents.js";
 
 const today=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);};
 const money=n=>`₹${Number(n||0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -46,14 +47,14 @@ export async function renderPurchasesScreen(screen,user){
   let currentMode="standard";
   let currentTemplate=[];
 
-  screen.innerHTML=`<div class="screen-head"><div><h1>Purchases</h1><p>Itemized purchases add stock automatically; unpaid value remains in supplier dues.</p></div></div>${allowed?`<div class="card"><div class="card-title">New purchase</div><form id="purchase-form"><div class="form-grid"><div class="field"><label>Supplier</label><select name="supplier_id" required><option value="">Choose supplier</option>${optionRows(suppliers)}</select></div><div class="field"><label>Payment</label><select name="paid_from_account_id"><option value="">Unpaid — add to supplier dues</option>${optionRows(accounts.filter(a=>["cash","bank","collection_account"].includes(a.type)))}</select></div><div class="field"><label>Date</label><input name="txn_date" type="date" value="${today()}" required></div><div class="field"><label>Bill note (optional)</label><input name="description" maxlength="500"></div></div><div id="purchase-mode-note"></div><div class="card-title">Purchase items</div><div id="purchase-lines" class="line-items"></div><div id="purchase-order-summary"></div><button type="button" class="btn btn-small" id="add-purchase-line">+ Add item</button><p class="purchase-total">Purchase total: <strong id="purchase-total">₹0.00</strong></p><div class="form-status"></div><button class="btn btn-primary">Record purchase</button></form></div>`:""}<div class="card table-wrap"><div class="card-title">Recent purchases</div><table class="ledger"><thead><tr><th>Date</th><th>Supplier</th><th>Items</th><th>Payment</th><th>Note</th><th class="num">Total</th><th></th></tr></thead><tbody id="purchases-history-body"></tbody></table><div class="history-controls" id="purchases-history-controls"></div></div>`;
+  screen.innerHTML=`<div class="screen-head"><div><h1>Purchases</h1><p>Itemized purchases add stock automatically; unpaid value remains in supplier dues.</p></div></div>${allowed?`<div class="card"><div class="card-title">New purchase</div><form id="purchase-form"><div class="form-grid"><div class="field"><label>Supplier</label><select name="supplier_id" required><option value="">Choose supplier</option>${optionRows(suppliers)}</select></div><div class="field"><label>Payment</label><select name="paid_from_account_id"><option value="">Unpaid — add to supplier dues</option>${optionRows(accounts.filter(a=>["cash","bank","collection_account"].includes(a.type)))}</select></div><div class="field"><label>Date</label><input name="txn_date" type="date" value="${today()}" required></div><div class="field"><label>Bill note (optional)</label><input name="description" maxlength="500"></div><div class="field"><label>Document type</label><select name="document_type"><option value="invoice">Invoice</option><option value="receipt">Receipt</option><option value="bill">Bill</option><option value="other">Other</option></select></div><div class="field"><label>Invoice / receipt (optional)</label><input name="document_file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp"><small>PDF/JPG/PNG/WEBP · max 10 MB. You can attach it later from Recent purchases.</small></div></div><div id="purchase-mode-note"></div><div class="card-title">Purchase items</div><div id="purchase-lines" class="line-items"></div><div id="purchase-order-summary"></div><button type="button" class="btn btn-small" id="add-purchase-line">+ Add item</button><p class="purchase-total">Purchase total: <strong id="purchase-total">₹0.00</strong></p><div class="form-status"></div><button class="btn btn-primary">Record purchase</button></form></div>`:""}<div class="card table-wrap"><div class="card-title">Recent purchases</div><table class="ledger"><thead><tr><th>Date</th><th>Supplier</th><th>Items</th><th>Payment</th><th>Note</th><th class="num">Total</th><th>Document</th><th></th></tr></thead><tbody id="purchases-history-body"></tbody></table><div class="history-controls" id="purchases-history-controls"></div></div>`;
 
   const renderHistoryRow=p=>{
     const d=Array.isArray(p.purchase_details)?p.purchase_details[0]:p.purchase_details;
     const isTasty=!!tastySupplier && d?.supplier_id===tastySupplier.id;
-    return `<tr><td>${esc(p.txn_date)}</td><td>${esc(supplierName.get(d?.supplier_id)||"—")}</td><td>${p.purchase_items?.length||0}</td><td>${Number(d?.paid_amount||0)>0?'<span class="stamp paid">Paid</span>':'<span class="stamp unpaid">Unpaid</span>'}</td><td>${esc(p.description||"—")}</td><td class="num">${money(p.amount)}</td><td>${isTasty?`<button type="button" class="btn btn-small franchise-order-image" data-txn-id="${p.id}" data-date="${esc(p.txn_date)}" data-supplier-id="${esc(d?.supplier_id||"")}">Order image</button>`:""}</td></tr>`;
+    return `<tr><td>${esc(p.txn_date)}</td><td>${esc(supplierName.get(d?.supplier_id)||"—")}</td><td>${p.purchase_items?.length||0}</td><td>${Number(d?.paid_amount||0)>0?'<span class="stamp paid">Paid</span>':'<span class="stamp unpaid">Unpaid</span>'}</td><td>${esc(p.description||"—")}</td><td class="num">${money(p.amount)}</td><td data-document-cell="${p.id}"></td><td>${isTasty?`<button type="button" class="btn btn-small franchise-order-image" data-txn-id="${p.id}" data-date="${esc(p.txn_date)}" data-supplier-id="${esc(d?.supplier_id||"")}">Order image</button>`:""}</td></tr>`;
   };
-  createHistoryController({tbody:screen.querySelector("#purchases-history-body"),controls:screen.querySelector("#purchases-history-controls"),type:"purchase",select:"id,txn_date,amount,description,created_at,purchase_details(supplier_id,paid_amount),purchase_items(id)",initialRows:purchases,colspan:7,renderRow:renderHistoryRow});
+  createHistoryController({tbody:screen.querySelector("#purchases-history-body"),controls:screen.querySelector("#purchases-history-controls"),type:"purchase",select:"id,txn_date,amount,description,created_at,purchase_details(supplier_id,paid_amount),purchase_items(id)",initialRows:purchases,colspan:8,renderRow:renderHistoryRow,onRender:async(rows)=>{try{await decorateDocumentCells(screen,rows.map(r=>r.id),canDo(user,"record_purchase"));}catch(error){console.error("Document status load failed",error);}}});
 
   const host=screen.querySelector("#purchase-lines");
   const summaryHost=screen.querySelector("#purchase-order-summary");
@@ -184,7 +185,12 @@ export async function renderPurchasesScreen(screen,user){
     c.font="500 20px Segoe UI, Arial";rows.forEach((r,i)=>{const y=y0+42+i*rowH;c.fillText(r.item,30,y);c.fillText(r.abbr,510,y);c.textAlign="right";c.fillText(`${r.qty}${r.unit?` ${r.unit}`:""}`,850,y);c.textAlign="left";c.beginPath();c.moveTo(20,y+15);c.lineTo(880,y+15);c.stroke();});
     const a=document.createElement("a");a.download=`Tasty_Vadapav_Order_${txnDate}.png`;a.href=canvas.toDataURL("image/png");a.click();
   };
-  screen.addEventListener("click",async e=>{const b=e.target.closest(".franchise-order-image");if(!b)return;try{b.disabled=true;b.textContent="Preparing…";await drawOrderImage(b.dataset.txnId,b.dataset.date,b.dataset.supplierId);}catch(err){alert(err.message);}finally{b.disabled=false;b.textContent="Order image";}});
+  screen.addEventListener("click",async e=>{
+    const orderButton=e.target.closest(".franchise-order-image");
+    if(orderButton){try{orderButton.disabled=true;orderButton.textContent="Preparing…";await drawOrderImage(orderButton.dataset.txnId,orderButton.dataset.date,orderButton.dataset.supplierId);}catch(err){alert(err.message);}finally{orderButton.disabled=false;orderButton.textContent="Order image";}return;}
+    const documentButton=e.target.closest(".document-attach");
+    if(documentButton){const detail=[...purchases].find(x=>x.id===documentButton.dataset.txnId)?.purchase_details;const d=Array.isArray(detail)?detail[0]:detail;await openDocumentModal({screen,transactionId:documentButton.dataset.txnId,supplierId:d?.supplier_id||null,user,onDone:async()=>{try{await decorateDocumentCells(screen,[documentButton.dataset.txnId],canDo(user,"record_purchase"));}catch(error){console.error(error);}}});}
+  });
 
   form.addEventListener("submit",async e=>{
     e.preventDefault();
@@ -201,8 +207,14 @@ export async function renderPurchasesScreen(screen,user){
     if(gstOverrides.length&&user.role==="owner")updateMasterGstRates=window.confirm(`Some GST rates differ from the master GST rate.\n\nOK = update master GST rate(s) from now onward.\nCancel = use the changed GST rate(s) for this purchase only.`);
     if((rateOverrides.length||gstOverrides.length)&&user.role!=="owner")window.alert("Changed rates/GST percentages will apply to this purchase only. Only the Owner can update master values.");
     state(feedback,"Recording purchase…");
+    const documentFile=fd.get("document_file");
+    if(documentFile?.size&&!navigator.onLine){state(feedback,"Document uploads require an internet connection. Remove the file or reconnect before recording this purchase.",true);return;}
     const {data:txnId,error}=await supabase.rpc("create_purchase_with_master_rate_updates",{p_supplier_id:fd.get("supplier_id"),p_paid_from_account_id:fd.get("paid_from_account_id")||null,p_txn_date:fd.get("txn_date"),p_description:fd.get("description").trim()||null,p_items:lines,p_update_master_rates:updateMasterRates,p_update_master_gst_rates:updateMasterGstRates});
     if(error){state(feedback,error.message,true);return;}
+    if(documentFile?.size){
+      try{state(feedback,"Purchase recorded. Uploading invoice/receipt…");await uploadDocument({file:documentFile,documentType:fd.get("document_type")||"invoice",supplierId:fd.get("supplier_id"),documentDate:fd.get("txn_date"),transactionIds:[txnId]});}
+      catch(documentError){state(feedback,`Purchase recorded, but the document could not be attached: ${documentError.message}`,true);}
+    }
     if(currentMode==="tasty"){await drawOrderImage(txnId,fd.get("txn_date"),fd.get("supplier_id"));await renderPurchasesScreen(screen,user);}
     else await renderPurchasesScreen(screen,user);
   });

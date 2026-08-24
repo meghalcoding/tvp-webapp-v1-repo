@@ -29,7 +29,7 @@ export async function fetchTransactionPage({ type, select, cursor = null, limit 
   return data || [];
 }
 
-export function createHistoryController({ tbody, controls, type, select, renderRow, colspan, initialRows }) {
+export function createHistoryController({ tbody, controls, type, select, renderRow, colspan, initialRows, onRender }) {
   let rows = [...initialRows];
   let cursor = rows.length ? rows[rows.length - 1] : null;
   let loading = false;
@@ -48,6 +48,7 @@ export function createHistoryController({ tbody, controls, type, select, renderR
     if (!tbody) return;
     tbody.innerHTML = rows.map(renderRow).join("") || `<tr><td colspan="${colspan}">No records recorded.</td></tr>`;
     renderControls();
+    onRender?.(rows);
   };
 
   async function loadMore() {

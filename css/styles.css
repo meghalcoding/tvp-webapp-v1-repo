@@ -516,3 +516,26 @@ small { color: var(--steel); }
   .franchise-template-row .template-map,
   .franchise-template-row .template-unmapped { grid-column: 1 / -1; }
 }
+
+/* Phase 4A — financial document management */
+.document-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:150px}
+.document-tag{display:inline-flex;align-items:center;border:1px solid var(--ink);border-radius:999px;padding:3px 7px;font-size:.68rem;font-weight:700;white-space:nowrap}
+.document-tag.missing{color:var(--chutney-red);border-color:var(--chutney-red);background:#fff4f0}
+.document-tag.uploaded{color:var(--chutney-green);border-color:var(--chutney-green);background:#f1f7f1}
+.document-modal{max-width:760px;max-height:88vh;overflow:auto}
+.document-modal hr{border:0;border-top:1px solid var(--border);margin:18px 0}
+.document-modal h3{margin:12px 0 8px}
+.document-list{display:grid;gap:8px}
+.document-list-row{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid var(--border);padding:9px 10px;background:var(--paper)}
+.document-list-row>div:first-child{display:grid;gap:2px;min-width:0}
+.document-list-row span{font-size:.76rem;color:var(--steel)}
+.document-link-picker{margin:14px 0;padding:8px 10px;border:1px solid var(--border);background:#faf7ef}
+.document-link-picker summary{cursor:pointer;font-weight:700}
+.document-link-list{display:grid;gap:5px;max-height:260px;overflow:auto;margin-top:10px}
+.document-link-option{display:flex;gap:8px;align-items:flex-start;padding:6px;border-bottom:1px solid var(--border);font-size:.8rem}
+.document-link-option input{margin-top:3px}
+.document-actions .btn{font-size:.68rem;padding:3px 7px}
+@media (max-width: 760px){
+  .document-list-row{align-items:flex-start;flex-direction:column}
+  .document-actions{min-width:0}
+}
