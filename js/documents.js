@@ -67,35 +67,19 @@ export async function uploadDocument({ file, documentType = "other", supplierId 
   if (uploadError) throw uploadError;
 
   try {
-    const { data: appUser, error: appUserError } = await supabase
-      .from("users")
-      .select("id")
-      .eq("auth_id", authId)
-      .maybeSingle();
-    if (appUserError || !appUser) throw appUserError || new Error("No active application profile exists for this account.");
-
-    const { data: document, error: documentError } = await supabase
-      .from("documents")
-      .insert({
-        file_name: file.name,
-        storage_path: storagePath,
-        mime_type: file.type,
-        size_bytes: file.size,
-        document_type: documentType,
-        uploaded_by: appUser.id,
-        supplier_id: supplierId || null,
-        invoice_number: invoiceNumber?.trim() || null,
-        document_date: documentDate || null,
-        notes: notes?.trim() || null,
-      })
-      .select("id,file_name,storage_path,mime_type,size_bytes,document_type,supplier_id,invoice_number,document_date,notes,created_at")
-      .single();
+    const { data: document, error: documentError } = await supabase.rpc("create_financial_document", {
+      p_file_name: file.name,
+      p_storage_path: storagePath,
+      p_mime_type: file.type,
+      p_size_bytes: file.size,
+      p_document_type: documentType,
+      p_supplier_id: supplierId || null,
+      p_invoice_number: invoiceNumber?.trim() || null,
+      p_document_date: documentDate || null,
+      p_notes: notes?.trim() || null,
+      p_transaction_ids: [...new Set(transactionIds.filter(Boolean))],
+    });
     if (documentError) throw documentError;
-
-    for (const transactionId of [...new Set(transactionIds.filter(Boolean))]) {
-      const { error } = await supabase.rpc("link_document_to_transaction", { p_document_id: document.id, p_transaction_id: transactionId });
-      if (error) throw error;
-    }
     return document;
   } catch (error) {
     await supabase.storage.from(DOCUMENT_BUCKET).remove([storagePath]);

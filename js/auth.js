@@ -46,9 +46,14 @@ export async function getCurrentAppUser(forceRefresh = false) {
 }
 
 export function onAuthStateChange(callback) {
-  return supabase.auth.onAuthStateChange((_event, session) => {
-    cachedAppUser = null; // role may have changed; refetch next time it's needed
-    callback(session);
+  return supabase.auth.onAuthStateChange((event, session) => {
+    // TOKEN_REFRESHED fires whenever the browser tab regains focus. It must not
+    // rebuild the current screen: doing so destroys in-progress forms, line
+    // items and selected File objects. Only real auth/session transitions need
+    // to reach the application router.
+    if (event === "TOKEN_REFRESHED") return;
+    cachedAppUser = null;
+    callback(event, session);
   });
 }
 

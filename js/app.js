@@ -89,10 +89,14 @@ async function boot() {
     if (session) await enterApp();
     else showLogin();
 
-    onAuthStateChange(async (session) => {
+    onAuthStateChange(async (event, session) => {
       try {
-        if (session) await enterApp();
-        else showLogin();
+        if (event === "SIGNED_OUT" || !session) { showLogin(); return; }
+        // SIGNED_IN/USER_UPDATED can require a bootstrap; token refreshes are
+        // deliberately ignored by auth.js so the active form remains intact.
+        if (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "INITIAL_SESSION") {
+          if (document.getElementById("app-shell")?.classList.contains("hidden") || !currentAppUser) await enterApp();
+        }
       } catch (error) {
         console.error("Auth state handling failed:", error);
         showAuthError(error);
@@ -132,7 +136,10 @@ async function enterApp() {
   window.__appUser = currentAppUser;
   renderUserBadges();
   renderNav();
-  window.addEventListener("hashchange", renderRoute);
+  if (!window.__routeListenerBound) {
+    window.addEventListener("hashchange", renderRoute);
+    window.__routeListenerBound = true;
+  }
   renderRoute();
   trySync();
 }

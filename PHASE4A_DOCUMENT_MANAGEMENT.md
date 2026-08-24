@@ -146,3 +146,29 @@ Those capabilities are reserved for Phase 4B, which will use this document layer
 - [x] Signed URLs are used for opening documents.
 - [x] No financial transaction is changed by attachment operations.
 - [x] OCR is deferred to Phase 4B.
+
+
+## Phase 4A Corrections
+
+`db/phase4a_corrections.sql` is required after the original Phase 4A migration. It corrects the initial implementation in four areas:
+
+1. Grants the authenticated API role the required privileges on `documents` and `transaction_documents`.
+2. Adds `create_financial_document(...)`, a security-definer transaction that creates document metadata and all requested transaction links atomically after the private Storage upload.
+3. Reloads the PostgREST schema cache so the new relationship is visible to the REST API.
+4. Adds true unpaid-expense accounting through an `Expense Payables` liability account and a controlled `record_expense_payment(...)` workflow.
+
+### Session/form preservation
+
+Supabase `TOKEN_REFRESHED` events are deliberately ignored by the application router. Returning to an existing browser tab must not re-render the current route because that would destroy in-progress form values, dynamic purchase/expense rows, and selected file objects.
+
+### Acceptance tests
+
+- Upload an invoice while creating an expense and confirm the transaction and document are both present.
+- Upload a document from Recent Expenses/Purchases and confirm it links successfully.
+- Open the same document from the Documents library and from its transaction.
+- Link one document to multiple transactions.
+- Verify an entry without a document shows `No Invoice/Receipt`.
+- Record an unpaid expense and verify `Unpaid — add to expense dues` plus an outstanding balance.
+- Pay the expense due from Cash/Bank/UPI collection account and verify the outstanding amount decreases to zero.
+- Switch to another browser tab and return while filling a purchase/expense; the form must remain intact.
+- Trigger a normal auth token refresh and verify the current screen is not rebuilt.
