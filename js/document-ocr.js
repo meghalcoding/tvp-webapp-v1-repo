@@ -25,13 +25,67 @@ async function getPdfJs() {
   return pdfPromise;
 }
 
-async function imageText(blob, language, progress) {
+async function imageBlobFromCanvas(file, rotation = 0, enhance = true) {
+  const bitmap = await createImageBitmap(file);
+  const portrait = bitmap.height > bitmap.width;
+  const rotated = rotation === 90 || rotation === 270;
+  const srcW = bitmap.width, srcH = bitmap.height;
+  const maxDim = 2400;
+  const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
+  const w = Math.max(1, Math.round(srcW * scale));
+  const h = Math.max(1, Math.round(srcH * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = rotated ? h : w;
+  canvas.height = rotated ? w : h;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.save();
+  if (rotation === 90) { ctx.translate(h, 0); ctx.rotate(Math.PI / 2); }
+  else if (rotation === 270) { ctx.translate(0, w); ctx.rotate(-Math.PI / 2); }
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  ctx.restore();
+  bitmap.close?.();
+
+  if (enhance) {
+    const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const d = image.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      const boosted = Math.max(0, Math.min(255, (gray - 128) * 1.45 + 128));
+      d[i] = d[i + 1] = d[i + 2] = boosted;
+    }
+    ctx.putImageData(image, 0, 0);
+  }
+  return canvas;
+}
+
+async function imageText(file, language, progress) {
   const { createWorker } = await getTesseract();
   const worker = await createWorker(language);
   try {
-    const result = await worker.recognize(blob, {}, { blocks: true });
-    progress?.(100, "OCR complete");
-    return result.data.text || "";
+    const rotations = file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/webp' ? [0, 90, 270] : [0];
+    const candidates = [];
+    for (let i = 0; i < rotations.length; i += 1) {
+      const rotation = rotations[i];
+      progress?.(Math.round((i / rotations.length) * 75), rotation ? `Reading document (rotated ${rotation}°)…` : 'Reading document…');
+      const canvas = await imageBlobFromCanvas(file, rotation, true);
+      if (worker.setParameters) {
+      await worker.setParameters({
+        tessedit_pageseg_mode: '6',
+        preserve_interword_spaces: '1',
+      });
+    }
+    const result = await worker.recognize(canvas, {}, { blocks: true });
+      const text = result.data.text || '';
+      const normalized = text.toLowerCase();
+      const keywordHits = ['invoice', 'total', 'gst', 'tax', 'quantity', 'price', 'amount', 'dabeli', 'chatni', 'chutney', 'vada', 'roti', 'tikki'].reduce((n, k) => n + (normalized.includes(k) ? 1 : 0), 0);
+      const confidence = Number(result.data.confidence || 0);
+      const score = confidence + keywordHits * 4 + (findDate(text) ? 5 : 0) + (findTotal(text) != null ? 8 : 0);
+      candidates.push({ text, score, rotation, confidence });
+      canvas.width = 1; canvas.height = 1;
+    }
+    candidates.sort((a, b) => b.score - a.score);
+    progress?.(100, 'OCR complete');
+    return candidates[0]?.text || '';
   } finally {
     await worker.terminate();
   }
@@ -94,13 +148,22 @@ function findInvoiceNumber(text) {
 }
 
 function findTotal(text) {
+  const lines = String(text || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  const candidates = [];
+  for (const line of lines) {
+    if (/(grand\s*total|invoice\s*amount|net\s*amount|amount\s*payable|total)/i.test(line)) {
+      const nums = numericTokens(line);
+      if (nums.length) candidates.push(nums[nums.length - 1]);
+    }
+  }
+  if (candidates.length) return candidates[candidates.length - 1];
   const patterns = [
-    /(?:grand\s*total|invoice\s*amount|net\s*amount|total\s*amount|amount\s*payable)\D{0,30}(?:₹|rs\.?|inr)?\s*([0-9][0-9,]*(?:\.\d{1,2})?)/i,
-    /(?:^|\n)\s*total\D{0,20}(?:₹|rs\.?|inr)?\s*([0-9][0-9,]*(?:\.\d{1,2})?)/im,
+    /(?:grand\s*total|invoice\s*amount|net\s*amount|total\s*amount|amount\s*payable)\D{0,50}(?:₹|rs\.?|inr)?\s*([0-9][0-9,]*(?:\.\d{1,2})?)/i,
+    /(?:^|\n)\s*total\D{0,30}(?:₹|rs\.?|inr)?\s*([0-9][0-9,]*(?:\.\d{1,2})?)/im,
   ];
   for (const re of patterns) {
-    const m = String(text || "").match(re);
-    if (m) return Number(m[1].replace(/,/g, ""));
+    const m = String(text || '').match(re);
+    if (m) return Number(m[1].replace(/,/g, ''));
   }
   return null;
 }
@@ -152,13 +215,28 @@ function matchItem(line, items) {
 function parseItemLine(line, items) {
   const item = matchItem(line, items);
   if (!item) return null;
-  const nums = numericTokens(line);
-  if (!nums.length) return { item, quantity: null, rate: null, gstRate: null, raw: line };
+  const raw = String(line || '').trim();
+  const itemAliases = aliasesForItem(item).sort((a, b) => b.length - a.length);
+  let remainder = raw;
+  for (const alias of itemAliases) {
+    const idx = normalize(remainder).indexOf(normalize(alias));
+    if (idx >= 0) {
+      const originalLower = remainder.toLowerCase();
+      const aliasLower = alias.toLowerCase();
+      const directIdx = originalLower.indexOf(aliasLower);
+      remainder = directIdx >= 0 ? remainder.slice(directIdx + alias.length) : remainder;
+      break;
+    }
+  }
+  // OCR table rows often start with a serial number. We deliberately parse
+  // numbers AFTER the item name so "1 Vada Masalo 7 Kg ₹70 ₹24.50 ₹514.50"
+  // yields quantity=7 and rate=70 instead of quantity=1 and rate=7.
+  const nums = numericTokens(remainder);
   const pct = String(line).match(/([0-9]+(?:\.\d+)?)\s*%/);
-  const gstRate = pct ? Number(pct[1]) : null;
-  const quantity = nums[0] || null;
-  const rate = nums.length >= 2 ? nums[1] : null;
-  return { item, quantity, rate, gstRate, raw: line };
+  const gstRate = pct ? Number(pct[1]) : Number(item.gst_rate ?? 0);
+  const quantity = nums[0] ?? null;
+  const rate = nums[1] ?? null;
+  return { item, quantity, rate, gstRate, raw };
 }
 
 function parsePurchase(text, items, suppliers) {

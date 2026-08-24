@@ -36,3 +36,19 @@ The expense entry now converts an empty Paid-from selection into SQL `NULL` befo
 4. Confirm master rates/GST remain locked unless the review explicitly selects the invoice value.
 5. Record the purchase.
 6. Repeat in Expenses and verify an unpaid expense can now be recorded.
+
+## Phase 4B correction — unpaid expenses and invoice-table OCR
+
+### Unpaid expense
+A dedicated `create_unpaid_expense_idempotent` RPC is used when the payment selector is set to Unpaid. This avoids sending an empty UUID to the legacy expense writer and records the expense against the `Expense Payables` liability account. Paid expenses continue using the normal expense writer.
+
+### Invoice image OCR
+The image OCR pipeline now:
+- preprocesses photographs for contrast/grayscale;
+- evaluates 0°, 90°, and 270° orientations for image documents;
+- selects the strongest OCR candidate using confidence plus financial/document keywords;
+- uses a table-friendly Tesseract page segmentation mode;
+- parses quantity and invoice rate from numbers appearing after the matched item name, avoiding the row serial number;
+- prefers the final numeric value on a `Total` row, which handles rows such as `Total 78.5 109.50 2299.50` correctly.
+
+These changes are still review-first: OCR never silently changes a master rate or GST rate.

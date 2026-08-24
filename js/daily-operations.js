@@ -72,8 +72,13 @@ export async function renderExpensesScreen(screen, user) {
     status(feedback,navigator.onLine?"Recording expense…":"Expense queued for sync.");
     let txnId=null;
     try {
-      if(documentFile?.size){
-        const {data,error}=await supabase.rpc("create_expense_idempotent",payload);
+      const isUnpaid = !payload.p_paid_from_account_id;
+      if (documentFile?.size || isUnpaid) {
+        const rpcName = isUnpaid ? "create_unpaid_expense_idempotent" : "create_expense_idempotent";
+        const rpcPayload = isUnpaid
+          ? { p_client_uuid: payload.p_client_uuid, p_category_id: payload.p_category_id, p_amount: payload.p_amount, p_txn_date: payload.p_txn_date, p_description: payload.p_description, p_items: payload.p_items }
+          : payload;
+        const {data,error}=await supabase.rpc(rpcName,rpcPayload);
         if(error)throw error; txnId=data;
       } else {
         const result=await postOutboxSafe("expense",payload,"create_expense_idempotent");
