@@ -3,6 +3,7 @@ import { canDo } from "./auth.js";
 import { withOfflineFallback } from "./offline-queue.js";
 import { createHistoryController, fetchTransactionPage, HISTORY_INITIAL_LIMIT } from "./paginated-history.js";
 import { decorateDocumentCells, openDocumentModal, uploadDocument } from "./documents.js";
+import { openDocumentOcrReview } from "./document-ocr.js";
 
 const today=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);};
 const money=n=>`₹${Number(n||0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -47,7 +48,7 @@ export async function renderPurchasesScreen(screen,user){
   let currentMode="standard";
   let currentTemplate=[];
 
-  screen.innerHTML=`<div class="screen-head"><div><h1>Purchases</h1><p>Itemized purchases add stock automatically; unpaid value remains in supplier dues.</p></div></div>${allowed?`<div class="card"><div class="card-title">New purchase</div><form id="purchase-form"><div class="form-grid"><div class="field"><label>Supplier</label><select name="supplier_id" required><option value="">Choose supplier</option>${optionRows(suppliers)}</select></div><div class="field"><label>Payment</label><select name="paid_from_account_id"><option value="">Unpaid — add to supplier dues</option>${optionRows(accounts.filter(a=>["cash","bank","collection_account"].includes(a.type)))}</select></div><div class="field"><label>Date</label><input name="txn_date" type="date" value="${today()}" required></div><div class="field"><label>Bill note (optional)</label><input name="description" maxlength="500"></div><div class="field"><label>Document type</label><select name="document_type"><option value="invoice">Invoice</option><option value="receipt">Receipt</option><option value="bill">Bill</option><option value="other">Other</option></select></div><div class="field"><label>Invoice / receipt (optional)</label><input name="document_file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp"><small>PDF/JPG/PNG/WEBP · max 10 MB. You can attach it later from Recent purchases.</small></div></div><div id="purchase-mode-note"></div><div class="card-title">Purchase items</div><div id="purchase-lines" class="line-items"></div><div id="purchase-order-summary"></div><button type="button" class="btn btn-small" id="add-purchase-line">+ Add item</button><p class="purchase-total">Purchase total: <strong id="purchase-total">₹0.00</strong></p><div class="form-status"></div><button class="btn btn-primary">Record purchase</button></form></div>`:""}<div class="card table-wrap"><div class="card-title">Recent purchases</div><table class="ledger"><thead><tr><th>Date</th><th>Supplier</th><th>Items</th><th>Payment</th><th>Note</th><th class="num">Total</th><th>Document</th><th></th></tr></thead><tbody id="purchases-history-body"></tbody></table><div class="history-controls" id="purchases-history-controls"></div></div>`;
+  screen.innerHTML=`<div class="screen-head"><div><h1>Purchases</h1><p>Itemized purchases add stock automatically; unpaid value remains in supplier dues.</p></div></div>${allowed?`<div class="card"><div class="card-title">New purchase</div><form id="purchase-form"><div class="form-grid"><div class="field"><label>Supplier</label><select name="supplier_id" required><option value="">Choose supplier</option>${optionRows(suppliers)}</select></div><div class="field"><label>Payment</label><select name="paid_from_account_id"><option value="">Unpaid — add to supplier dues</option>${optionRows(accounts.filter(a=>["cash","bank","collection_account"].includes(a.type)))}</select></div><div class="field"><label>Date</label><input name="txn_date" type="date" value="${today()}" required></div><div class="field"><label>Bill note (optional)</label><input name="description" maxlength="500"></div><div class="field"><label>Document type</label><select name="document_type"><option value="invoice">Invoice</option><option value="receipt">Receipt</option><option value="bill">Bill</option><option value="other">Other</option></select></div><div class="field"><label>Invoice / receipt (optional)</label><input name="document_file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp"><button type="button" class="btn btn-small document-ocr-button hidden" id="purchase-ocr-button">Extract from document</button><small>PDF/JPG/PNG/WEBP · max 10 MB. You can attach it later from Recent purchases.</small></div></div><div id="purchase-mode-note"></div><div class="card-title">Purchase items</div><div id="purchase-lines" class="line-items"></div><div id="purchase-order-summary"></div><button type="button" class="btn btn-small" id="add-purchase-line">+ Add item</button><p class="purchase-total">Purchase total: <strong id="purchase-total">₹0.00</strong></p><div class="form-status"></div><button class="btn btn-primary">Record purchase</button></form></div>`:""}<div class="card table-wrap"><div class="card-title">Recent purchases</div><table class="ledger"><thead><tr><th>Date</th><th>Supplier</th><th>Items</th><th>Payment</th><th>Note</th><th class="num">Total</th><th>Document</th><th></th></tr></thead><tbody id="purchases-history-body"></tbody></table><div class="history-controls" id="purchases-history-controls"></div></div>`;
 
   const renderHistoryRow=p=>{
     const d=Array.isArray(p.purchase_details)?p.purchase_details[0]:p.purchase_details;
@@ -161,6 +162,36 @@ export async function renderPurchasesScreen(screen,user){
     }
     makeStandardRow();calc();
   };
+
+  const purchaseFileInput = screen.querySelector('[name="document_file"]');
+  const purchaseOcrButton = screen.querySelector("#purchase-ocr-button");
+  purchaseFileInput?.addEventListener("change", () => { purchaseOcrButton?.classList.toggle("hidden", !purchaseFileInput.files?.[0]); });
+  purchaseOcrButton?.addEventListener("click", () => {
+    const file = purchaseFileInput?.files?.[0]; if (!file) return;
+    openDocumentOcrReview({ screen, file, mode: "purchase", items, suppliers, onApply: result => {
+      if (result.date) form.elements.txn_date.value = result.date;
+      const applyRows = () => {
+        const rowsNow = [...host.querySelectorAll(".purchase-line")];
+        result.items.forEach((x, index) => {
+          let row = rowsNow.find(r => r._purchaseState?.itemId === x.item.id);
+          if (!row && currentMode === "standard") row = makeStandardRow();
+          if (!row) return;
+          const s = row._purchaseState;
+          s.itemId = x.item.id; s.displayName = x.item.name; s.unit = x.item.unit; s.masterRate = Number(x.item.master_rate ?? 0); s.masterGstRate = Number(x.item.gst_rate ?? 0);
+          s.quantity = x.quantity ?? "";
+          s.rate = x.useRate && x.rate != null ? x.rate : s.masterRate; s.rateLocked = !(x.useRate && x.rate != null); s.rateOverridden = Number(s.rate) !== Number(s.masterRate);
+          s.gstRate = x.useGst && x.gstRate != null ? x.gstRate : s.masterGstRate; s.gstLocked = !(x.useGst && x.gstRate != null); s.gstOverridden = Number(s.gstRate) !== Number(s.masterGstRate);
+          if (currentMode === "standard") { const select = row.querySelector("[data-item]"); if (select) select.value = x.item.id; }
+          syncRow(row);
+        });
+        calc();
+      };
+      if (result.supplierId) {
+        form.elements.supplier_id.value = result.supplierId;
+        loadSupplierMode(result.supplierId).then(applyRows).catch(err => state(form.querySelector(".form-status"), err.message, true));
+      } else applyRows();
+    }});
+  });
 
   screen.querySelector('[name="supplier_id"]')?.addEventListener("change",async e=>{
     try{await loadSupplierMode(e.currentTarget.value);}catch(err){state(form.querySelector(".form-status"),err.message,true);}

@@ -539,3 +539,19 @@ small { color: var(--steel); }
   .document-list-row{align-items:flex-start;flex-direction:column}
   .document-actions{min-width:0}
 }
+
+/* Phase 4B — document extraction review */
+.ocr-modal { max-width: 980px; }
+.ocr-progress { height: 7px; background: var(--paper-2, #eee6d6); border-radius: 999px; overflow: hidden; margin: 12px 0 16px; }
+.ocr-progress-bar { height: 100%; background: var(--accent, #c98400); transition: width .2s ease; }
+.ocr-review { margin-top: 16px; }
+.ocr-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.ocr-lines { display: grid; gap: 10px; max-height: 360px; overflow: auto; }
+.ocr-line { display: grid; grid-template-columns: minmax(180px,1.5fr) repeat(3,minmax(100px,.7fr)) minmax(120px,.9fr); gap: 8px; align-items: end; border: 1px solid var(--line,#d6c7a7); padding: 10px; border-radius: 8px; }
+.ocr-line > div { min-width: 0; }
+.ocr-line small { display:block; margin-top:4px; color:var(--steel,#666); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ocr-raw { margin-top: 14px; }
+.ocr-raw pre { max-height: 220px; overflow: auto; white-space: pre-wrap; font-size: .78rem; background: #f8f4eb; padding: 10px; border-radius: 8px; }
+.ocr-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+.document-ocr-button { margin-top: 7px; }
+@media (max-width: 850px) { .ocr-grid { grid-template-columns: 1fr; } .ocr-line { grid-template-columns: 1fr 1fr; } .ocr-line > div { grid-column: 1 / -1; } }
