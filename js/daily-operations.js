@@ -192,119 +192,233 @@ export async function renderExpensesScreen(screen, user) {
   if (!IS_CONFIGURED) { screen.innerHTML = noConfig(); return; }
   const { accounts, categories } = await masters();
   const relations = await loadMasterRelations();
-  const expenses = await fetchTransactionPage({ type: "expense", select: "id,txn_date,amount,description,created_at,expense_details(category_id,paid_from_account_id,item_id,supplier_id),expense_items(id)", limit: HISTORY_INITIAL_LIMIT });
+  const expenses = await fetchTransactionPage({ type: "expense", select: "id,txn_date,amount,description,created_at,expense_details(category_id,paid_from_account_id,item_id,supplier_id),expense_items(id,item_id)", limit: HISTORY_INITIAL_LIMIT });
   const { data: expenseBalanceRows } = await supabase.from("expense_balances").select("expense_id,paid_amount,outstanding").in("expense_id", expenses.map(e => e.id));
   const expenseBalances = new Map((expenseBalanceRows || []).map(x => [x.expense_id, x]));
-  const categoryNames = new Map(categories.map((c) => [c.id, c.name])); const accountNames = new Map(accounts.map((a) => [a.id, a.name])); const detailed = canDo(user, "record_detailed_expense");
-  screen.innerHTML = `<div class="screen-head"><div><h1>Expenses</h1><p>Quick expenses take seconds; detailed expense lines are available to Owners and Managers.</p></div></div><div class="card"><div class="card-title">New expense</div><form id="expense-form" class="form-grid"><div class="field"><label>Category</label><select name="category_id" required><option value="">Choose category</option>${categories.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select></div><div class="field"><label>Expense item (optional)</label><div class="item-autocomplete"><input id="expense-primary-item-search" list="expense-item-options" placeholder="Type an item…" autocomplete="off"><input name="expense_item_id" id="expense-primary-item" type="hidden"></div><datalist id="expense-item-options"></datalist><small class="muted">Type to search all items. A matching item selects its category automatically.</small></div><div class="field"><label>Supplier / Vendor (optional)</label><select name="supplier_id" id="expense-supplier"><option value="">Choose vendor</option>${relations.suppliers.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select><small class="muted">Only vendors linked to the selected Expense Category will remain available.</small></div><div class="field"><label>Paid from</label><select name="paid_from_account_id"><option value="">Unpaid — add to expense dues</option>${accountOptions(accounts, ["cash", "bank", "collection_account"])}</select></div><div class="field"><label>Amount</label><input name="amount" type="number" min="0.01" step="0.01" required /></div><div class="field"><label>Date</label><input name="txn_date" type="date" value="${today()}" required /></div><div class="field field-wide"><label>Note (optional)</label><input name="description" maxlength="500" /></div><div class="field"><label>Document type</label><select name="document_type"><option value="receipt">Receipt</option><option value="invoice">Invoice</option><option value="bill">Bill</option><option value="other">Other</option></select></div><div class="field"><label>Invoice / receipt (optional)</label><input name="document_file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" /><button type="button" class="btn btn-small document-ocr-button hidden" id="expense-ocr-button">Extract details from document</button><small>PDF/JPG/PNG/WEBP · max 10 MB. You can attach it later from Recent expenses.</small></div>${detailed ? `<div class="field field-wide"><label class="check-label"><input type="checkbox" id="expense-detailed" /> Add detailed items</label><div id="expense-items" class="hidden"><div class="line-items" id="expense-item-rows"></div><button type="button" class="btn btn-small" id="add-expense-item">+ Add item</button><p class="muted">Detailed items must total exactly to the expense amount.</p></div></div>` : ""}<div class="field field-wide"><div class="form-status"></div><button class="btn btn-primary">Record expense</button></div></form></div><div class="card table-wrap"><div class="card-title">Recent expenses</div><table class="ledger"><thead><tr><th>Date</th><th>Category</th><th>Paid from</th><th>Note</th><th>Entry</th><th class="num">Amount</th><th>Payment</th><th>Document</th></tr></thead><tbody id="expenses-history-body"></tbody></table><div class="history-controls" id="expenses-history-controls"></div></div>`;
-  createHistoryController({ tbody: screen.querySelector("#expenses-history-body"), controls: screen.querySelector("#expenses-history-controls"), type: "expense", select: "id,txn_date,amount,description,created_at,expense_details(category_id,paid_from_account_id,item_id,supplier_id),expense_items(id)", initialRows: expenses, colspan: 8, renderRow: (e) => { const d = Array.isArray(e.expense_details) ? e.expense_details[0] : e.expense_details; const due = expenseBalances.get(e.id); const unpaid = !d?.paid_from_account_id; const paymentHtml = unpaid ? `<span class="stamp unpaid">Unpaid</span>${due && Number(due.outstanding)>0 && canDo(user,"supplier_payment") ? ` <button type="button" class="btn btn-small pay-expense-due" data-id="${e.id}" data-due="${due.outstanding}">Pay</button>` : ""}` : `<span class="stamp paid">Paid</span>`; return `<tr><td>${esc(e.txn_date)}</td><td>${esc(categoryNames.get(d?.category_id) || "—")}</td><td>${esc(unpaid ? "Expense Due" : (accountNames.get(d?.paid_from_account_id) || "—"))}</td><td>${esc(e.description || "—")}</td><td>${e.expense_items?.length ? "Detailed" : "Quick"}</td><td class="num">${money(e.amount)}</td><td>${paymentHtml}</td><td data-document-cell="${e.id}"></td></tr>`; }, onRender: async(rows) => { try { await decorateDocumentCells(screen, rows.map(r => r.id), canDo(user, "record_quick_expense")); } catch(error) { console.error("Document status load failed", error); } } });
-  const primaryItemSearch = screen.querySelector("#expense-primary-item-search");
-  const primaryItemSelect = screen.querySelector("#expense-primary-item");
-  const categorySelect = screen.querySelector("[name=category_id]");
-  const supplierSelect = screen.querySelector("[name=supplier_id]");
-  let primaryCandidates=[];
-  const refreshPrimaryItems = (preserveId = "") => {
-    const categoryId = categorySelect?.value || "";
-    const linked = categoryId ? expenseItemIdsForCategory(relations, categoryId) : null;
-    const candidates = linked ? relations.items.filter(i => linked.has(i.id)) : relations.items;
-    primaryCandidates=candidates;screen.querySelector("#expense-item-options").innerHTML=candidates.map(i=>`<option value="${esc(i.name)}">${esc(i.unit||"")}</option>`).join("");primaryItemSelect.value=preserveId;
-    if (preserveId && candidates.some(i=>i.id===preserveId)) primaryItemSearch.value = relations.items.find(i=>i.id===preserveId)?.name || "";
-    else if (!preserveId) primaryItemSearch.value = "";
-  };
-  const refreshSuppliers = (preserveId = "") => {
-    const categoryId = categorySelect?.value || "";
-    const allowed = categoryId ? new Set((relations.supplierExpense||[]).filter(x=>x.expense_category_id===categoryId).map(x=>x.supplier_id)) : null;
-    const candidates = allowed ? relations.suppliers.filter(s=>allowed.has(s.id)) : relations.suppliers;
-    supplierSelect.innerHTML = `<option value="">Choose vendor</option>${candidates.map(s=>`<option value="${s.id}" ${s.id===preserveId?"selected":""}>${esc(s.name)}</option>`).join("")}`;
-  };
-  primaryItemSearch?.addEventListener("input",()=>{
-    const item=primaryCandidates.find(i=>i.name.toLowerCase()===primaryItemSearch.value.trim().toLowerCase());if(!item){if(!primaryItemSearch.value.trim())primaryItemSelect.value="";return;} const id=item.id;primaryItemSelect.value=id;
-    if(!id)return;
-    const cats=expenseCategoriesForItem(relations,id);
-    if(cats.length===1){ categorySelect.value=cats[0]; refreshPrimaryItems(id); refreshSuppliers(supplierSelect?.value||""); }
+  const categoryNames = new Map(categories.map((c) => [c.id, c.name]));
+  const accountNames = new Map(accounts.map((a) => [a.id, a.name]));
+
+  screen.innerHTML = `<div class="screen-head"><div><h1>Expenses</h1><p>Choose a category or search an item. Only items where you enter a value become expense lines. Supplier is optional.</p></div></div>
+  <div class="card"><div class="card-title">New expense</div>
+    <form id="expense-form">
+      <div class="expense-entry-toolbar">
+        <div class="field">
+          <label>Category</label>
+          <select name="category_id" id="expense-category" required><option value="">Choose category</option>${categories.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select>
+        </div>
+        <div class="field expense-item-search-field">
+          <label>Search item</label>
+          <input id="expense-item-search" list="expense-master-item-options" placeholder="Type an item name…" autocomplete="off">
+          <datalist id="expense-master-item-options">${relations.items.filter(i => (relations.expenseMap || []).some(x => x.item_id === i.id)).map(i => `<option value="${esc(i.name)}">${esc(i.unit || "")}</option>`).join("")}</datalist>
+          <small class="muted">Selecting an item automatically selects its Expense Category when there is one unambiguous match.</small>
+        </div>
+      </div>
+      <div id="expense-item-category-choice" class="expense-item-category-choice hidden"></div>
+      <div id="expense-category-items" class="expense-category-items">
+        <div class="empty-state muted">Choose a category or search for an item to load its linked master items.</div>
+      </div>
+      <div class="expense-entry-summary">
+        <div><span>Total expense</span><strong id="expense-total">₹0.00</strong></div>
+        <small class="muted">Blank item rows are ignored. Enter quantity, rate, or amount only for items you actually incurred.</small>
+      </div>
+      <div class="expense-secondary-fields">
+        <div class="field"><label>Supplier / Vendor <span class="muted">(optional)</span></label><select name="supplier_id" id="expense-supplier"><option value="">Choose vendor</option></select><small class="muted">Supplier is optional and does not determine the category or items.</small></div>
+        <div class="field"><label>Paid from</label><select name="paid_from_account_id"><option value="">Unpaid — add to expense dues</option>${accountOptions(accounts, ["cash", "bank", "collection_account"])}</select></div>
+        <div class="field"><label>Date</label><input name="txn_date" type="date" value="${today()}" required></div>
+        <div class="field"><label>Document type</label><select name="document_type"><option value="receipt">Receipt</option><option value="invoice">Invoice</option><option value="bill">Bill</option><option value="other">Other</option></select></div>
+        <div class="field field-wide"><label>Invoice / receipt (optional)</label><input name="document_file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp"><button type="button" class="btn btn-small document-ocr-button hidden" id="expense-ocr-button">Extract details from document</button><small>PDF/JPG/PNG/WEBP · max 10 MB. You can attach it later from Recent expenses.</small></div>
+        <div class="field field-wide"><label>Note (optional)</label><input name="description" maxlength="500" placeholder="Optional expense note"></div>
+      </div>
+      <div class="form-status"></div><button class="btn btn-primary">Record expense</button>
+    </form>
+  </div>
+  <div class="card table-wrap"><div class="card-title">Recent expenses</div><table class="ledger"><thead><tr><th>Date</th><th>Category</th><th>Paid from</th><th>Note</th><th>Entry</th><th class="num">Amount</th><th>Payment</th><th>Document</th></tr></thead><tbody id="expenses-history-body"></tbody></table><div class="history-controls" id="expenses-history-controls"></div></div>`;
+
+  createHistoryController({
+    tbody: screen.querySelector("#expenses-history-body"), controls: screen.querySelector("#expenses-history-controls"), type: "expense",
+    select: "id,txn_date,amount,description,created_at,expense_details(category_id,paid_from_account_id,item_id,supplier_id),expense_items(id,item_id)", initialRows: expenses, colspan: 8,
+    renderRow: (e) => {
+      const d = Array.isArray(e.expense_details) ? e.expense_details[0] : e.expense_details;
+      const due = expenseBalances.get(e.id); const unpaid = !d?.paid_from_account_id;
+      const paymentHtml = unpaid ? `<span class="stamp unpaid">Unpaid</span>${due && Number(due.outstanding)>0 && canDo(user,"supplier_payment") ? ` <button type="button" class="btn btn-small pay-expense-due" data-id="${e.id}" data-due="${due.outstanding}">Pay</button>` : ""}` : `<span class="stamp paid">Paid</span>`;
+      return `<tr><td>${esc(e.txn_date)}</td><td>${esc(categoryNames.get(d?.category_id) || "—")}</td><td>${esc(unpaid ? "Expense Due" : (accountNames.get(d?.paid_from_account_id) || "—"))}</td><td>${esc(e.description || "—")}</td><td>${e.expense_items?.length ? `${e.expense_items.length} item${e.expense_items.length===1?"":"s"}` : "—"}</td><td class="num">${money(e.amount)}</td><td>${paymentHtml}</td><td data-document-cell="${e.id}"></td></tr>`;
+    },
+    onRender: async(rows) => { try { await decorateDocumentCells(screen, rows.map(r => r.id), canDo(user, "record_quick_expense")); } catch(error) { console.error("Document status load failed", error); } }
   });
-  categorySelect?.addEventListener("change",()=>{refreshPrimaryItems(primaryItemSelect?.value||"");refreshSuppliers(supplierSelect?.value||"");});
-  refreshPrimaryItems();
+
+  const form = screen.querySelector("#expense-form");
+  const categorySelect = screen.querySelector("#expense-category");
+  const itemSearch = screen.querySelector("#expense-item-search");
+  const categoryChoice = screen.querySelector("#expense-item-category-choice");
+  const itemHost = screen.querySelector("#expense-category-items");
+  const totalEl = screen.querySelector("#expense-total");
+  const supplierSelect = screen.querySelector("#expense-supplier");
+  let activeCategoryId = "";
+
+  const linkedItemsForCategory = categoryId => {
+    const ids = expenseItemIdsForCategory(relations, categoryId);
+    return relations.items.filter(i => ids.has(i.id));
+  };
+
+  const refreshSuppliers = (preserveId = "") => {
+    const categoryId = categorySelect.value || "";
+    const allowed = categoryId ? new Set((relations.supplierExpense || []).filter(x => x.expense_category_id === categoryId).map(x => x.supplier_id)) : null;
+    const candidates = allowed ? relations.suppliers.filter(s => allowed.has(s.id)) : relations.suppliers;
+    supplierSelect.innerHTML = `<option value="">Choose vendor</option>${candidates.map(s => `<option value="${s.id}" ${s.id===preserveId?"selected":""}>${esc(s.name)}</option>`).join("")}`;
+  };
+
+  const calculateTotal = () => {
+    const total = [...itemHost.querySelectorAll(".expense-item-row")].reduce((sum, row) => sum + Number(row._expenseState?.amount || 0), 0);
+    totalEl.textContent = money(total);
+    return Math.round(total * 100) / 100;
+  };
+
+  const makeItemRow = item => {
+    const row = document.createElement("div");
+    row.className = "expense-item-row";
+    const masterRate = Number(item.master_rate ?? item.last_purchase_rate ?? 0);
+    const masterGst = Number(item.gst_rate || 0);
+    row._expenseState = { itemId: item.id, amount: 0, manualAmount: false };
+    row.innerHTML = `<div class="expense-item-main"><strong>${esc(item.name)}</strong><span>${esc(item.unit || "—")}</span></div>
+      <label><span>Qty</span><input data-qty type="number" min="0" step="0.001" inputmode="decimal" placeholder="—"></label>
+      <label><span>Rate</span><input data-rate type="number" min="0" step="0.01" inputmode="decimal" value="${masterRate || ""}" placeholder="Rate"></label>
+      <label><span>GST %</span><input data-gst type="number" min="0" max="100" step="0.01" inputmode="decimal" value="${masterGst}" placeholder="GST"></label>
+      <label class="expense-amount-field"><span>Amount</span><input data-amount type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount"></label>`;
+
+    const qty = row.querySelector("[data-qty]"), rate = row.querySelector("[data-rate]"), gst = row.querySelector("[data-gst]"), amount = row.querySelector("[data-amount]");
+    const syncAmount = () => {
+      if (row._expenseState.manualAmount) { row._expenseState.amount = Number(amount.value || 0); calculateTotal(); return; }
+      const q = Number(qty.value || 0), r = Number(rate.value || 0), g = Number(gst.value || 0);
+      const calculated = q > 0 && r >= 0 ? Math.round((q * r * (1 + g / 100)) * 100) / 100 : 0;
+      amount.value = calculated ? calculated.toFixed(2) : "";
+      row._expenseState.amount = calculated;
+      calculateTotal();
+    };
+    qty.addEventListener("input", syncAmount); rate.addEventListener("input", syncAmount); gst.addEventListener("input", syncAmount);
+    amount.addEventListener("input", () => { row._expenseState.manualAmount = true; row._expenseState.amount = Number(amount.value || 0); calculateTotal(); });
+    itemHost.append(row);
+    return row;
+  };
+
+  const renderCategoryItems = (categoryId, focusItemId = "") => {
+    activeCategoryId = categoryId || "";
+    const items = categoryId ? linkedItemsForCategory(categoryId) : [];
+    if (!items.length) {
+      itemHost.innerHTML = categoryId ? `<div class="empty-state muted">No Master Items are linked to this Expense Category yet.</div>` : `<div class="empty-state muted">Choose a category or search for an item to load its linked master items.</div>`;
+      calculateTotal(); refreshSuppliers(supplierSelect.value || ""); return;
+    }
+    itemHost.innerHTML = `<div class="expense-items-heading"><div><strong>${esc(categories.find(c=>c.id===categoryId)?.name || "Expense items")}</strong><span>${items.length} linked item${items.length===1?"":"s"}</span></div><span class="muted">Enter only the items you actually incurred.</span></div>`;
+    items.forEach(item => makeItemRow(item));
+    refreshSuppliers(supplierSelect.value || "");
+    if (focusItemId) {
+      const target = [...itemHost.querySelectorAll(".expense-item-row")].find(r => r._expenseState.itemId === focusItemId);
+      if (target) { target.classList.add("is-focused"); requestAnimationFrame(() => target.scrollIntoView({ block: "nearest", behavior: "smooth" })); target.querySelector("[data-qty]")?.focus(); }
+    }
+    calculateTotal();
+  };
+
+  const setCategoryFromItem = itemId => {
+    const categoryIds = expenseCategoriesForItem(relations, itemId);
+    categoryChoice.classList.add("hidden"); categoryChoice.innerHTML = "";
+    if (categoryIds.length === 1) {
+      categorySelect.value = categoryIds[0];
+      renderCategoryItems(categoryIds[0], itemId);
+      return;
+    }
+    if (categoryIds.length > 1) {
+      categoryChoice.classList.remove("hidden");
+      categoryChoice.innerHTML = `<div><strong>This item belongs to multiple Expense Categories.</strong><span>Choose the category for this expense.</span></div><div class="expense-category-choice-buttons">${categoryIds.map(id => `<button type="button" class="btn btn-small" data-category-choice="${id}">${esc(categoryNames.get(id) || "Category")}</button>`).join("")}</div>`;
+      categoryChoice.querySelectorAll("[data-category-choice]").forEach(btn => btn.addEventListener("click", () => { categorySelect.value = btn.dataset.categoryChoice; categoryChoice.classList.add("hidden"); renderCategoryItems(btn.dataset.categoryChoice, itemId); }));
+    }
+  };
+
+  categorySelect.addEventListener("change", () => {
+    const currentHasValues = [...itemHost.querySelectorAll(".expense-item-row")].some(r => Number(r._expenseState?.amount || 0) > 0);
+    if (currentHasValues && categorySelect.value !== activeCategoryId && !window.confirm("Changing category will clear the current item entries. Continue?")) { categorySelect.value = activeCategoryId; return; }
+    categoryChoice.classList.add("hidden"); itemSearch.value = ""; renderCategoryItems(categorySelect.value); 
+  });
+
+  itemSearch.addEventListener("input", () => {
+    const query = itemSearch.value.trim().toLowerCase();
+    const picked = relations.items.find(i => i.name.toLowerCase() === query && (relations.expenseMap || []).some(x => x.item_id === i.id));
+    if (!picked) return;
+    setCategoryFromItem(picked.id);
+  });
+
   refreshSuppliers();
 
-  let next = 0; const itemHost = screen.querySelector("#expense-items"); const rows = screen.querySelector("#expense-item-rows"); const expenseForm = screen.querySelector("#expense-form");
-  const addItem = () => { if (!rows) return; const id = next++; const selectedCategory = expenseForm?.elements?.category_id?.value || ""; const linked = expenseItemIdsForCategory(relations, selectedCategory); const candidates = relations.items.filter(i => linked.has(i.id)); const row = document.createElement("div"); row.className = "line-item-row"; row.innerHTML = `<div class="search-picker"><input data-item="search" placeholder="Search expense item…" autocomplete="off"><select data-item="expense_item" required><option value="">Choose linked item</option>${candidates.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join("")}</select></div><input data-item="quantity" type="number" min="0" step="0.001" placeholder="Qty"><input data-item="unit" placeholder="Unit" readonly><input data-item="rate" type="number" min="0" step="0.01" placeholder="Rate"><input data-item="amount" type="number" min="0.01" step="0.01" placeholder="Amount" required><button type="button" class="btn btn-small remove-item" aria-label="Remove item">×</button>`; const search=row.querySelector('[data-item="search"]'), select=row.querySelector('[data-item="expense_item"]'); search.addEventListener("input",()=>{const q=search.value.toLowerCase();[...select.options].forEach(o=>{if(!o.value)return;o.hidden=!o.text.toLowerCase().includes(q);});}); select.addEventListener("change",()=>{const it=relations.items.find(i=>i.id===select.value);row.querySelector('[data-item="unit"]').value=it?.unit||"";row.querySelector('[data-item="search"]').value=it?.name||"";}); row.querySelector(".remove-item").addEventListener("click", () => row.remove()); rows.append(row); };
-  const expenseFileInput = screen.querySelector('[name="document_file"]');
-  const expenseOcrButton = screen.querySelector("#expense-ocr-button");
+  const expenseFileInput = form.querySelector('[name="document_file"]');
+  const expenseOcrButton = form.querySelector("#expense-ocr-button");
   expenseFileInput?.addEventListener("change", () => { expenseOcrButton?.classList.toggle("hidden", !expenseFileInput.files?.[0]); });
   expenseOcrButton?.addEventListener("click", () => {
     const file = expenseFileInput?.files?.[0]; if (!file) return;
     openDocumentOcrReview({ screen, file, mode: "expense", onApply: result => {
-      if (result.date) expenseForm.elements.txn_date.value = result.date;
-      if (result.total) expenseForm.elements.amount.value = result.total;
-      if (result.invoiceNumber) { const note = expenseForm.elements.description.value.trim(); expenseForm.elements.description.value = note || `Invoice ${result.invoiceNumber}`; }
+      if (result.date) form.elements.txn_date.value = result.date;
+      if (result.invoiceNumber) { const note = form.elements.description.value.trim(); form.elements.description.value = note || `Invoice ${result.invoiceNumber}`; }
+      if (result.items?.length) {
+        const first = result.items.find(x => x.item?.id);
+        if (first) { itemSearch.value = first.item.name; setCategoryFromItem(first.item.id); }
+        setTimeout(() => {
+          result.items.forEach(x => {
+            const row = [...itemHost.querySelectorAll(".expense-item-row")].find(r => r._expenseState.itemId === x.item?.id);
+            if (!row) return;
+            if (x.quantity != null) row.querySelector("[data-qty]").value = x.quantity;
+            if (x.rate != null) row.querySelector("[data-rate]").value = x.rate;
+            if (x.gstRate != null) row.querySelector("[data-gst]").value = x.gstRate;
+            if (x.amount != null) { row.querySelector("[data-amount]").value = x.amount; row._expenseState.manualAmount = true; row._expenseState.amount = Number(x.amount); }
+          });
+          calculateTotal();
+        }, 0);
+      }
     }});
   });
-  screen.querySelector("[name=category_id]")?.addEventListener("change", () => { if (!rows?.children.length) return; const values=[...rows.children].map(r=>({item:r.querySelector('[data-item="expense_item"]')?.value||"",quantity:r.querySelector('[data-item="quantity"]')?.value||"",unit:r.querySelector('[data-item="unit"]')?.value||"",rate:r.querySelector('[data-item="rate"]')?.value||"",amount:r.querySelector('[data-item="amount"]')?.value||""})); rows.innerHTML=""; values.forEach(v=>{addItem(); const r=rows.lastElementChild; const sel=r.querySelector('[data-item="expense_item"]'); if([...sel.options].some(o=>o.value===v.item)){sel.value=v.item; sel.dispatchEvent(new Event("change"));} r.querySelector('[data-item="quantity"]').value=v.quantity; r.querySelector('[data-item="rate"]').value=v.rate; r.querySelector('[data-item="amount"]').value=v.amount;}); });
-  screen.querySelector("#expense-detailed")?.addEventListener("change", (e) => { itemHost.classList.toggle("hidden", !e.target.checked); if (e.target.checked && !rows.children.length) addItem(); }); screen.querySelector("#add-expense-item")?.addEventListener("click", addItem);
-  screen.querySelector("#expense-form")?.addEventListener("submit", async (event) => {
-    event.preventDefault(); const formEl=event.currentTarget; const form=new FormData(formEl); const feedback=formEl.querySelector(".form-status");
-    const items=[...(rows?.querySelectorAll(".line-item-row")||[])].map((row)=>{const sel=row.querySelector("[data-item=expense_item]"); const chosen=relations.items.find(i=>i.id===sel?.value); return {description:chosen?.name||"",quantity:row.querySelector("[data-item=quantity]")?.value||"",unit:row.querySelector("[data-item=unit]")?.value||"",rate:row.querySelector("[data-item=rate]")?.value||"",amount:row.querySelector("[data-item=amount]")?.value||""};});
-    if(items.some((i)=>!i.description||!Number(i.amount))){status(feedback,"Complete every detailed item or remove the empty row.",true);return;}
-    const documentFile=form.get("document_file");
-    if(documentFile?.size&&!navigator.onLine){status(feedback,"Document uploads require an internet connection. Remove the file or reconnect before recording this expense.",true);return;}
-    if(items.length&&!navigator.onLine){status(feedback,"Detailed expenses require a connection.",true);return;}
-    const payload={p_client_uuid:crypto.randomUUID(),p_category_id:form.get("category_id"),p_paid_from_account_id:form.get("paid_from_account_id") || null,p_amount:Number(form.get("amount")),p_txn_date:form.get("txn_date"),p_description:form.get("description").trim()||null,p_items:items}; const primaryExpenseItemId=form.get("expense_item_id")||null;
-    status(feedback,navigator.onLine?"Recording expense…":"Expense queued for sync.");
-    let txnId=null;
+
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const formData = new FormData(form); const feedback = form.querySelector(".form-status");
+    const categoryId = formData.get("category_id");
+    const lines = [...itemHost.querySelectorAll(".expense-item-row")].map(row => ({ row, state: row._expenseState })).filter(x => Number(x.state?.amount || 0) > 0);
+    const amount = Math.round(lines.reduce((sum, x) => sum + Number(x.state.amount || 0), 0) * 100) / 100;
+    if (!categoryId) { status(feedback, "Choose an Expense Category.", true); return; }
+    if (!lines.length || amount <= 0) { status(feedback, "Enter a quantity or amount for at least one item.", true); return; }
+    const items = lines.map(({row,state}) => ({ item_id: state.itemId, description: row.querySelector(".expense-item-main strong")?.textContent || "", quantity: row.querySelector("[data-qty]")?.value || "", unit: row.querySelector(".expense-item-main span")?.textContent || "", rate: row.querySelector("[data-rate]")?.value || "", gst_rate: row.querySelector("[data-gst]")?.value || "", amount: Number(state.amount || 0) }));
+    const documentFile = formData.get("document_file");
+    if (documentFile?.size && !navigator.onLine) { status(feedback, "Document uploads require an internet connection. Remove the file or reconnect before recording this expense.", true); return; }
+    const payload = { p_client_uuid: crypto.randomUUID(), p_category_id: categoryId, p_paid_from_account_id: formData.get("paid_from_account_id") || null, p_amount: amount, p_txn_date: formData.get("txn_date"), p_description: formData.get("description").trim() || null, p_items: items };
+    status(feedback, navigator.onLine ? "Recording expense…" : "Expense queued for sync.");
+    let txnId = null;
     try {
+      if (!navigator.onLine && documentFile?.size) throw new Error("Reconnect before attaching a document.");
       const isUnpaid = !payload.p_paid_from_account_id;
       if (documentFile?.size || isUnpaid) {
         const rpcName = isUnpaid ? "create_unpaid_expense_idempotent" : "create_expense_idempotent";
-        const rpcPayload = isUnpaid
-          ? { p_client_uuid: payload.p_client_uuid, p_category_id: payload.p_category_id, p_amount: payload.p_amount, p_txn_date: payload.p_txn_date, p_description: payload.p_description, p_items: payload.p_items }
-          : payload;
-        const {data,error}=await supabase.rpc(rpcName,rpcPayload);
-        if(error)throw error; txnId=data;
+        const rpcPayload = isUnpaid ? { p_client_uuid: payload.p_client_uuid, p_category_id: payload.p_category_id, p_amount: payload.p_amount, p_txn_date: payload.p_txn_date, p_description: payload.p_description, p_items: payload.p_items } : payload;
+        const { data, error } = await supabase.rpc(rpcName, rpcPayload); if (error) throw error; txnId = data;
       } else {
-        const result=await postOutboxSafe("expense",payload,"create_expense_idempotent");
-        txnId=typeof result === "string" ? result : result?.data || null;
+        const result = await postOutboxSafe("expense", payload, "create_expense_idempotent"); txnId = typeof result === "string" ? result : result?.data || null;
       }
-    } catch(err) { status(feedback,err.message,true);return; }
-    if(txnId && primaryExpenseItemId && navigator.onLine){
-      try { const {error:itemLinkError}=await supabase.rpc("set_expense_item",{p_transaction_id:txnId,p_item_id:primaryExpenseItemId}); if(itemLinkError)throw itemLinkError; }
-      catch(itemLinkError){ status(feedback,`Expense recorded, but the item link could not be saved: ${itemLinkError.message}`,true); return; }
+    } catch (err) { status(feedback, err.message, true); return; }
+    const supplierId = formData.get("supplier_id") || null;
+    if (txnId && supplierId && navigator.onLine) {
+      try { const { error } = await supabase.rpc("set_expense_supplier", { p_transaction_id: txnId, p_supplier_id: supplierId }); if (error) throw error; }
+      catch (error) { status(feedback, `Expense recorded, but the vendor link could not be saved: ${error.message}`, true); return; }
     }
-    const primarySupplierId=form.get("supplier_id")||null;
-    if(txnId && primarySupplierId && navigator.onLine){
-      try { const {error:supplierLinkError}=await supabase.rpc("set_expense_supplier",{p_transaction_id:txnId,p_supplier_id:primarySupplierId}); if(supplierLinkError)throw supplierLinkError; }
-      catch(supplierLinkError){ status(feedback,`Expense recorded, but the vendor link could not be saved: ${supplierLinkError.message}`,true); return; }
+    if (documentFile?.size && txnId) {
+      try { status(feedback, "Expense recorded. Uploading invoice/receipt…"); await uploadDocument({ file: documentFile, documentType: formData.get("document_type") || "receipt", documentDate: formData.get("txn_date"), transactionIds: [txnId] }); }
+      catch (documentError) { status(feedback, `Expense recorded, but the document could not be attached: ${documentError.message}`, true); }
     }
-    if(documentFile?.size&&txnId){
-      try { status(feedback,"Expense recorded. Uploading invoice/receipt…"); await uploadDocument({file:documentFile,documentType:form.get("document_type")||"receipt",documentDate:form.get("txn_date"),transactionIds:[txnId]}); }
-      catch(documentError){ status(feedback,`Expense recorded, but the document could not be attached: ${documentError.message}`,true); }
-    }
-    if(navigator.onLine) await renderExpensesScreen(screen,user);
+    if (navigator.onLine) await renderExpensesScreen(screen, user);
   });
+
   screen.addEventListener("click", async (event) => {
     const docButton = event.target.closest(".document-attach");
-    if (docButton) {
-      try { await openDocumentModal({ screen, transactionId: docButton.dataset.txnId, user, onDone: async () => { try { await decorateDocumentCells(screen, [docButton.dataset.txnId], canDo(user, "record_quick_expense")); } catch(error) { console.error(error); } } }); }
-      catch (error) { alert(error.message); }
-      return;
-    }
+    if (docButton) { try { await openDocumentModal({ screen, transactionId: docButton.dataset.txnId, user, onDone: async () => { try { await decorateDocumentCells(screen, [docButton.dataset.txnId], canDo(user, "record_quick_expense")); } catch(error) { console.error(error); } } }); } catch (error) { alert(error.message); } return; }
     const payButton = event.target.closest(".pay-expense-due");
     if (!payButton) return;
-    const amount = Number(payButton.dataset.due || 0);
-    const accountOptionsHtml = accountOptions(accounts, ["cash", "bank", "collection_account"]);
-    const mount = document.createElement("div");
-    mount.className = "document-modal-mount";
+    const amount = Number(payButton.dataset.due || 0); const accountOptionsHtml = accountOptions(accounts, ["cash", "bank", "collection_account"]); const mount = document.createElement("div"); mount.className = "document-modal-mount";
     mount.innerHTML = `<div class="modal-backdrop"><form class="modal-card" id="expense-payment-form"><button type="button" class="modal-close">×</button><h2>Pay expense due</h2><p class="muted">Outstanding: <strong>${money(amount)}</strong></p><div class="field"><label>Paid from</label><select name="account" required><option value="">Choose account</option>${accountOptionsHtml}</select></div><div class="field"><label>Amount</label><input name="amount" type="number" min="0.01" max="${amount}" step="0.01" value="${amount}" required></div><div class="field"><label>Date</label><input name="date" type="date" value="${today()}" required></div><div class="field"><label>Note (optional)</label><input name="note" maxlength="500"></div><div class="form-status"></div><button class="btn btn-primary">Record payment</button></form></div>`;
-    screen.append(mount);
-    const form = mount.querySelector("form");
-    mount.querySelector(".modal-close").onclick = () => mount.remove();
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault(); const fd = new FormData(form); const feedback = form.querySelector(".form-status");
-      status(feedback, "Recording payment…");
-      const { error } = await supabase.rpc("record_expense_payment", { p_expense_transaction_id: payButton.dataset.id, p_from_account_id: fd.get("account"), p_amount: Number(fd.get("amount")), p_txn_date: fd.get("date"), p_description: fd.get("note").trim() || null });
-      if (error) { status(feedback, error.message, true); return; }
-      mount.remove(); await renderExpensesScreen(screen, user);
-    });
+    screen.append(mount); const paymentForm = mount.querySelector("form"); mount.querySelector(".modal-close").onclick = () => mount.remove();
+    paymentForm.addEventListener("submit", async e => { e.preventDefault(); const fd = new FormData(paymentForm); const feedback = paymentForm.querySelector(".form-status"); status(feedback, "Recording payment…"); const { error } = await supabase.rpc("record_expense_payment", { p_expense_transaction_id: payButton.dataset.id, p_from_account_id: fd.get("account"), p_amount: Number(fd.get("amount")), p_txn_date: fd.get("date"), p_description: fd.get("note").trim() || null }); if (error) { status(feedback, error.message, true); return; } mount.remove(); await renderExpensesScreen(screen, user); });
   });
 }
 
