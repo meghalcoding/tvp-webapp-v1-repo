@@ -275,7 +275,7 @@ function reviewModal({ screen, file, items = [], suppliers = [], mode, onApply }
       <div class="field"><label>Document language</label><select id="ocr-language"><option value="eng">English / printed</option><option value="guj">Gujarati</option></select></div>
       <div class="field"><label>Selected file</label><input value="${esc(file?.name || "")}" disabled></div>
     </div>
-    <div class="ocr-progress"><div class="ocr-progress-bar" style="width:0%"></div></div>
+    <div class="ocr-progress"><div class="ocr-progress-bar"></div></div>
     <div class="form-status">Preparing OCR…</div>
     <div id="ocr-review" class="ocr-review hidden"></div>
     <details class="ocr-raw"><summary>Raw extracted text</summary><pre id="ocr-raw-text"></pre></details>

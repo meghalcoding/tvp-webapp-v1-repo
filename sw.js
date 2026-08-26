@@ -4,7 +4,7 @@
 // only the static shell. Bump CACHE_NAME on every deploy to invalidate.
 // ============================================================================
 
-const CACHE_NAME = "tasty-vadapav-shell-v20";
+const CACHE_NAME = "tasty-vadapav-shell-v21";
 const SHELL_FILES = [
   "./",
   "./index.html",

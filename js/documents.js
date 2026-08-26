@@ -1,3 +1,4 @@
+import { toast, confirmDialog, promptDialog, friendlyError, setButtonLoading } from "./ui.js";
 import { supabase, IS_CONFIGURED } from "./supabase-client.js";
 import { canDo } from "./auth.js";
 
@@ -167,8 +168,8 @@ export async function openDocumentModal({ screen, transactionId = null, supplier
     const map = await fetchTransactionDocuments([transactionId]);
     const docs = map.get(transactionId) || [];
     existing.innerHTML = `<h3>Linked to this transaction</h3>${docs.length ? `<div class="document-list">${docs.map((d) => `<div class="document-list-row"><div><strong>${esc(d.file_name)}</strong><span>${docTypeLabel(d.document_type)}${d.invoice_number ? ` · #${esc(d.invoice_number)}` : ""}</span></div><div><button class="btn btn-small document-open" data-path="${esc(d.storage_path || "")}" data-id="${d.id}">Open</button><button class="btn btn-small document-unlink" data-id="${d.id}">Unlink</button></div></div>`).join("")}</div>` : '<p class="muted">No Invoice/Receipt attached yet.</p>'}`;
-    existing.querySelectorAll(".document-open").forEach((b) => b.addEventListener("click", async () => { try { b.disabled = true; const url = await signedUrl(b.dataset.path); window.open(url, "_blank", "noopener"); } catch (e) { window.__toast(window.__friendlyError(e.message),{type:"error"}); } finally { b.disabled = false; } }));
-    existing.querySelectorAll(".document-unlink").forEach((b) => b.addEventListener("click", async () => { try { b.disabled = true; await unlinkDocument(b.dataset.id, transactionId); await renderExisting(); onDone?.(); } catch (e) { window.__toast(window.__friendlyError(e.message),{type:"error"}); b.disabled = false; } }));
+    existing.querySelectorAll(".document-open").forEach((b) => b.addEventListener("click", async () => { try { b.disabled = true; const url = await signedUrl(b.dataset.path); window.open(url, "_blank", "noopener"); } catch (e) { toast(friendlyError(e.message),{type:"error"}); } finally { b.disabled = false; } }));
+    existing.querySelectorAll(".document-unlink").forEach((b) => b.addEventListener("click", async () => { try { b.disabled = true; await unlinkDocument(b.dataset.id, transactionId); await renderExisting(); onDone?.(); } catch (e) { toast(friendlyError(e.message),{type:"error"}); b.disabled = false; } }));
   }
   await renderExisting();
 
@@ -192,7 +193,7 @@ export async function openDocumentModal({ screen, transactionId = null, supplier
 
 export async function openLinkExistingDocumentModal({ screen, documentId, onDone }) {
   let pickerTransactions = [];
-  try { pickerTransactions = await loadTransactionsForPicker(); } catch (error) { window.__toast(window.__friendlyError(error.message),{type:"error"}); return; }
+  try { pickerTransactions = await loadTransactionsForPicker(); } catch (error) { toast(friendlyError(error.message),{type:"error"}); return; }
   const mount = document.createElement("div");
   mount.className = "document-modal-mount";
   const options = pickerTransactions.map((t) => `<label class="document-link-option"><input type="checkbox" value="${t.id}"><span>${esc(t.label)} · ${esc(t.txn_date)} · ${money(t.amount)}</span></label>`).join("");
@@ -227,8 +228,8 @@ export async function renderDocumentsScreen(screen, user) {
     const body = screen.querySelector("#documents-body");
     if (error) { body.innerHTML = `<tr><td colspan="7"><span class="form-status error">${esc(error.message)}</span></td></tr>`; return; }
     body.innerHTML = (data || []).map((d) => `<tr><td><strong>${esc(d.file_name)}</strong></td><td>${docTypeLabel(d.document_type)}</td><td>${esc(d.invoice_number || "—")}</td><td>${esc(d.document_date || "—")}</td><td>${d.transaction_documents?.length || 0}</td><td>${esc(new Date(d.created_at).toLocaleDateString("en-IN"))}</td><td><button class="btn btn-small document-open-library" data-path="${esc(d.storage_path)}">Open</button><button class="btn btn-small document-link-library" data-id="${d.id}">Link</button></td></tr>`).join("") || '<tr><td colspan="7">No documents uploaded yet.</td></tr>';
-    body.querySelectorAll(".document-open-library").forEach((b) => b.addEventListener("click", async () => { try { const url = await signedUrl(b.dataset.path); window.open(url, "_blank", "noopener"); } catch (e) { window.__toast(window.__friendlyError(e.message),{type:"error"}); } }));
-    body.querySelectorAll(".document-link-library").forEach((b) => b.addEventListener("click", async () => { try { await openLinkExistingDocumentModal({ screen, documentId: b.dataset.id, onDone: load }); } catch (e) { window.__toast(window.__friendlyError(e.message),{type:"error"}); } }));
+    body.querySelectorAll(".document-open-library").forEach((b) => b.addEventListener("click", async () => { try { const url = await signedUrl(b.dataset.path); window.open(url, "_blank", "noopener"); } catch (e) { toast(friendlyError(e.message),{type:"error"}); } }));
+    body.querySelectorAll(".document-link-library").forEach((b) => b.addEventListener("click", async () => { try { await openLinkExistingDocumentModal({ screen, documentId: b.dataset.id, onDone: load }); } catch (e) { toast(friendlyError(e.message),{type:"error"}); } }));
   }
   screen.querySelector("#documents-upload")?.addEventListener("click", () => openDocumentModal({ screen, user, onDone: load }));
   await load();
