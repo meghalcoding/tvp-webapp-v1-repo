@@ -8,11 +8,15 @@
 const CACHE_NAME = "tasty-vadapav-shell-v20";
 =======
 <<<<<<< HEAD
+const CACHE_NAME = "tasty-vadapav-shell-v20";
+=======
+<<<<<<< HEAD
 const CACHE_NAME = "tasty-vadapav-shell-v17";
 =======
 const CACHE_NAME = "tasty-vadapav-shell-v16";
 >>>>>>> b115528b31c9b2e922ab9f661f430157364e890e
 >>>>>>> 85113897e4af68fa8c9bb83c5b90664562897551
+>>>>>>> 915a45b6855a9fe6da4ddbd198a9bccabe4b908a
 const SHELL_FILES = [
   "./",
   "./index.html",
