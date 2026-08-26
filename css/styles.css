@@ -655,6 +655,7 @@ body { overflow-x: hidden; }
     overscroll-behavior:contain;
   }
 }
+<<<<<<< HEAD
 
 /* ============================================================================
    EXPENSE — ITEM-FIRST ENTRY
@@ -700,3 +701,5 @@ body { overflow-x: hidden; }
   .expense-secondary-fields{grid-template-columns:1fr}
   .expense-entry-summary{align-items:flex-start;flex-direction:column;gap:4px}
 }
+=======
+>>>>>>> b115528b31c9b2e922ab9f661f430157364e890e
