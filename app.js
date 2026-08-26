@@ -226,8 +226,27 @@ function renderNav() {
   document.querySelectorAll('.nav-link').forEach(el => el.addEventListener('click', e => { e.preventDefault(); location.hash = `#/${el.dataset.path}`; }));
   const mobileSearch = document.getElementById('mobile-nav-search');
   if (mobileSearch) mobileSearch.onclick = focusMobileMenuSearch;
+  initSidebarCollapse();
 }
-function navLinkHtml(item) { return `<a href="#/${item.path}" class="nav-link ${item.secondary?'secondary':''}" data-path="${item.path}"><span class="icon">${ICONS[item.icon] || ICONS.masters}</span><span class="label">${item.label}</span></a>`; }
+const SIDEBAR_COLLAPSE_KEY = 'tvp_sidebar_collapsed';
+function initSidebarCollapse() {
+  const sidebarEl = document.querySelector('.sidebar');
+  const toggle = document.getElementById('sidebar-collapse-toggle');
+  if (!sidebarEl || !toggle || toggle.dataset.bound) return;
+  toggle.dataset.bound = '1';
+  const apply = (collapsed) => {
+    sidebarEl.classList.toggle('is-collapsed', collapsed);
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+    toggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+  };
+  apply(localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1');
+  toggle.addEventListener('click', () => {
+    const collapsed = !sidebarEl.classList.contains('is-collapsed');
+    apply(collapsed);
+    localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? '1' : '0');
+  });
+}
+function navLinkHtml(item) { return `<a href="#/${item.path}" class="nav-link ${item.secondary?'secondary':''}" data-path="${item.path}" title="${item.label}"><span class="icon">${ICONS[item.icon] || ICONS.masters}</span><span class="label">${item.label}</span></a>`; }
 function setActiveNav(path) { const active = path === 'reports' || path.startsWith('report-') ? 'reports' : path; document.querySelectorAll('.nav-link').forEach(el => el.classList.toggle('active', el.dataset.path === active)); }
 
 // ============================================================================

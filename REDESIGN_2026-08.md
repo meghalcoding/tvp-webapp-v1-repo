@@ -89,7 +89,30 @@ Toasts (`#toast-region`, `.toast`, success/error variants), confirm/prompt dialo
 - Rendered the real `renderNav()` logic from `js/app.js` in a headless browser and interactively tested: group collapse/expand, "Show more" reveal, search-filter (matching item shown, non-matching secondary items correctly stay hidden even inside an expanded group — this was a specificity bug caught and fixed during verification, not assumed correct), and search-clear reset.
 - Rendered the franchise purchase row and More screen markup before/after at a 390px mobile viewport and screenshotted both states to confirm the fix visually, not just by reading the CSS.
 - Rendered the Dashboard hero, Quick Actions menu (open state), segmented tabs, loading spinner, and both toast variants together to confirm visual output.
-- Service worker cache bumped to v22 so the update actually reaches users instead of being served from a stale cached shell.
+- Service worker cache bumped to v23 so the update actually reaches users instead of being served from a stale cached shell.
+
+## Round 4 — 2026-08-26 — Desktop sidebar collapse + nav-group header cleanup
+
+The live deployment the user was viewing (`tvp-finapp.meghalcoding.workers.dev`) was still serving a pre-Round-3 build — the reported "black blocks on More" and the boxed-looking `.nav-group-toggle` buttons were both already fixed in Round 3's local files, they just hadn't been deployed yet. **Round 3's fixes are unchanged and still in place** (verified by grep below); this round adds the new desktop feature that was requested alongside.
+
+### Added
+
+- **Collapsible desktop sidebar.** A small chevron button at the top of the sidebar (next to the wordmark) toggles between the full 264px sidebar and a 72px icon-only rail — the same interaction pattern as Mail/Finder on macOS. Collapsed state:
+  - Hides group headers, the search box, and "Show more" — every destination (including previously-collapsed "secondary" items) becomes a flat icon list so nothing becomes unreachable.
+  - Each icon carries a native `title` tooltip (added `title="${item.label}"` to `navLinkHtml()` in `js/app.js`) so the destination is still identifiable on hover.
+  - The active-item indicator switches from a left accent bar to a bottom accent bar, which reads better in a narrow icon column.
+  - State persists across reloads via `localStorage` (`tvp_sidebar_collapsed`), applied in a new `initSidebarCollapse()` in `js/app.js`, called once from `renderNav()`.
+  - `.sidebar` already reflows `.main-col` naturally (flexbox, no fixed positioning), so no layout-shift bugs from this change.
+- Confirmed (re-grepped) that `.nav-group-toggle` still has `border:0; background:transparent;` from Round 3 — it should not render as a boxed button. If it still looks boxed after redeploying this build, it's very likely still a stale Service Worker cache; the cache name was bumped again (v23→ check `sw.js`) specifically to force that refresh.
+
+### Verification performed
+
+- `node tools/check.mjs` / `node tools/check-design.mjs` — both passed.
+- Rendered the real `renderNav()` + new `initSidebarCollapse()` logic in a headless browser, clicked the toggle, and screenshotted both the expanded and collapsed states to confirm no broken layout, no orphaned "Show more" buttons, and every nav item still reachable when collapsed.
+
+### Deployment note for the user
+
+Please redeploy this zip (not the previous one) to `tvp-finapp.meghalcoding.workers.dev`, and if the old styling still shows afterward, do a hard refresh (or clear the site's Service Worker in DevTools → Application → Service Workers) — the app is a PWA with an offline cache, so an old build can persist locally even after a new one is deployed until the cache version changes and the browser picks it up.
 
 ### Still open (not touched this pass — flagging rather than silently skipping)
 

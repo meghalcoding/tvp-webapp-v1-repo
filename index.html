@@ -44,10 +44,15 @@
 <div id="app-shell" class="hidden">
 
   <aside class="sidebar">
-    <a href="#/dashboard" class="signboard signboard-link" aria-label="Go to Dashboard">
-      <span class="wordmark"><span class="mark-1">TASTY</span><br/><span class="mark-2">VADAPAV</span></span>
-      <span class="tagline">Control Center</span>
-    </a>
+    <div class="sidebar-head">
+      <a href="#/dashboard" class="signboard signboard-link" aria-label="Go to Dashboard">
+        <span class="wordmark"><span class="mark-1">TASTY</span><br/><span class="mark-2">VADAPAV</span></span>
+        <span class="tagline">Control Center</span>
+      </a>
+      <button type="button" class="sidebar-collapse-toggle" id="sidebar-collapse-toggle" aria-label="Collapse sidebar" aria-expanded="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+    </div>
     <nav id="sidebar-nav"></nav>
   </aside>
 
