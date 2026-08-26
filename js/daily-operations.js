@@ -273,6 +273,7 @@ export async function renderExpensesScreen(screen, user) {
     return Math.round(total * 100) / 100;
   };
 
+<<<<<<< HEAD
   const syncExpenseInputLock = (input, button, label, locked) => {
     if (!input || !button) return;
     input.disabled = locked;
@@ -293,11 +294,14 @@ export async function renderExpensesScreen(screen, user) {
     syncExpenseInputLock(input, button, "Rate", Boolean(state.rateLocked));
   };
 
+=======
+>>>>>>> 85113897e4af68fa8c9bb83c5b90664562897551
   const makeItemRow = item => {
     const row = document.createElement("div");
     row.className = "expense-item-row";
     const masterRate = Number(item.master_rate ?? item.last_purchase_rate ?? 0);
     const masterGst = Number(item.gst_rate || 0);
+<<<<<<< HEAD
     row._expenseState = {
       itemId: item.id, amount: 0, manualAmount: false,
       masterRate, rate: masterRate > 0 ? masterRate : "", rateLocked: masterRate > 0, rateOverridden: false,
@@ -322,12 +326,25 @@ export async function renderExpensesScreen(screen, user) {
         calculateTotal();
         return;
       }
+=======
+    row._expenseState = { itemId: item.id, amount: 0, manualAmount: false };
+    row.innerHTML = `<div class="expense-item-main"><strong>${esc(item.name)}</strong><span>${esc(item.unit || "—")}</span></div>
+      <label><span>Qty</span><input data-qty type="number" min="0" step="0.001" inputmode="decimal" placeholder="—"></label>
+      <label><span>Rate</span><input data-rate type="number" min="0" step="0.01" inputmode="decimal" value="${masterRate || ""}" placeholder="Rate"></label>
+      <label><span>GST %</span><input data-gst type="number" min="0" max="100" step="0.01" inputmode="decimal" value="${masterGst}" placeholder="GST"></label>
+      <label class="expense-amount-field"><span>Amount</span><input data-amount type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount"></label>`;
+
+    const qty = row.querySelector("[data-qty]"), rate = row.querySelector("[data-rate]"), gst = row.querySelector("[data-gst]"), amount = row.querySelector("[data-amount]");
+    const syncAmount = () => {
+      if (row._expenseState.manualAmount) { row._expenseState.amount = Number(amount.value || 0); calculateTotal(); return; }
+>>>>>>> 85113897e4af68fa8c9bb83c5b90664562897551
       const q = Number(qty.value || 0), r = Number(rate.value || 0), g = Number(gst.value || 0);
       const calculated = q > 0 && r >= 0 ? Math.round((q * r * (1 + g / 100)) * 100) / 100 : 0;
       amount.value = calculated ? calculated.toFixed(2) : "";
       row._expenseState.amount = calculated;
       calculateTotal();
     };
+<<<<<<< HEAD
 
     qty.addEventListener("input", syncAmount);
     rate.addEventListener("input", () => {
@@ -364,11 +381,18 @@ export async function renderExpensesScreen(screen, user) {
 
     syncExpenseRateControl(rate, rateBtn, row._expenseState);
     syncExpenseInputLock(gst, gstBtn, "GST", true);
+=======
+    qty.addEventListener("input", syncAmount); rate.addEventListener("input", syncAmount); gst.addEventListener("input", syncAmount);
+    amount.addEventListener("input", () => { row._expenseState.manualAmount = true; row._expenseState.amount = Number(amount.value || 0); calculateTotal(); });
+>>>>>>> 85113897e4af68fa8c9bb83c5b90664562897551
     itemHost.append(row);
     return row;
   };
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 85113897e4af68fa8c9bb83c5b90664562897551
   const renderCategoryItems = (categoryId, focusItemId = "") => {
     activeCategoryId = categoryId || "";
     const items = categoryId ? linkedItemsForCategory(categoryId) : [];
@@ -401,9 +425,15 @@ export async function renderExpensesScreen(screen, user) {
     }
   };
 
+<<<<<<< HEAD
   categorySelect.addEventListener("change", async () => {
     const currentHasValues = [...itemHost.querySelectorAll(".expense-item-row")].some(r => Number(r._expenseState?.amount || 0) > 0);
     if (currentHasValues && categorySelect.value !== activeCategoryId && !(await window.__confirmDialog({title:"Change expense category?",body:"Changing the category will clear the item entries you have already entered.",confirmLabel:"Change category",cancelLabel:"Keep current entries"}))) { categorySelect.value = activeCategoryId; return; }
+=======
+  categorySelect.addEventListener("change", () => {
+    const currentHasValues = [...itemHost.querySelectorAll(".expense-item-row")].some(r => Number(r._expenseState?.amount || 0) > 0);
+    if (currentHasValues && categorySelect.value !== activeCategoryId && !window.confirm("Changing category will clear the current item entries. Continue?")) { categorySelect.value = activeCategoryId; return; }
+>>>>>>> 85113897e4af68fa8c9bb83c5b90664562897551
     categoryChoice.classList.add("hidden"); itemSearch.value = ""; renderCategoryItems(categorySelect.value); 
   });
 
@@ -450,6 +480,7 @@ export async function renderExpensesScreen(screen, user) {
     const amount = Math.round(lines.reduce((sum, x) => sum + Number(x.state.amount || 0), 0) * 100) / 100;
     if (!categoryId) { status(feedback, "Choose an Expense Category.", true); return; }
     if (!lines.length || amount <= 0) { status(feedback, "Enter a quantity or amount for at least one item.", true); return; }
+<<<<<<< HEAD
     const items = lines.map(({row,state}) => ({
       item_id: state.itemId,
       description: row.querySelector(".expense-item-main strong")?.textContent || "",
@@ -520,12 +551,44 @@ export async function renderExpensesScreen(screen, user) {
       try { status(feedback, "Expense recorded. Uploading invoice/receipt…"); await uploadDocument({ file: documentFile, documentType: formData.get("document_type") || "receipt", documentDate: formData.get("txn_date"), transactionIds: [txnId] }); }
       catch (documentError) { status(feedback, `Expense recorded, but the document could not be attached: ${documentError.message}`, true); }
     }
+=======
+    const items = lines.map(({row,state}) => ({ item_id: state.itemId, description: row.querySelector(".expense-item-main strong")?.textContent || "", quantity: row.querySelector("[data-qty]")?.value || "", unit: row.querySelector(".expense-item-main span")?.textContent || "", rate: row.querySelector("[data-rate]")?.value || "", gst_rate: row.querySelector("[data-gst]")?.value || "", amount: Number(state.amount || 0) }));
+    const documentFile = formData.get("document_file");
+    if (documentFile?.size && !navigator.onLine) { status(feedback, "Document uploads require an internet connection. Remove the file or reconnect before recording this expense.", true); return; }
+    const payload = { p_client_uuid: crypto.randomUUID(), p_category_id: categoryId, p_paid_from_account_id: formData.get("paid_from_account_id") || null, p_amount: amount, p_txn_date: formData.get("txn_date"), p_description: formData.get("description").trim() || null, p_items: items };
+    status(feedback, navigator.onLine ? "Recording expense…" : "Expense queued for sync.");
+    let txnId = null;
+    try {
+      if (!navigator.onLine && documentFile?.size) throw new Error("Reconnect before attaching a document.");
+      const isUnpaid = !payload.p_paid_from_account_id;
+      if (documentFile?.size || isUnpaid) {
+        const rpcName = isUnpaid ? "create_unpaid_expense_idempotent" : "create_expense_idempotent";
+        const rpcPayload = isUnpaid ? { p_client_uuid: payload.p_client_uuid, p_category_id: payload.p_category_id, p_amount: payload.p_amount, p_txn_date: payload.p_txn_date, p_description: payload.p_description, p_items: payload.p_items } : payload;
+        const { data, error } = await supabase.rpc(rpcName, rpcPayload); if (error) throw error; txnId = data;
+      } else {
+        const result = await postOutboxSafe("expense", payload, "create_expense_idempotent"); txnId = typeof result === "string" ? result : result?.data || null;
+      }
+    } catch (err) { status(feedback, err.message, true); return; }
+    const supplierId = formData.get("supplier_id") || null;
+    if (txnId && supplierId && navigator.onLine) {
+      try { const { error } = await supabase.rpc("set_expense_supplier", { p_transaction_id: txnId, p_supplier_id: supplierId }); if (error) throw error; }
+      catch (error) { status(feedback, `Expense recorded, but the vendor link could not be saved: ${error.message}`, true); return; }
+    }
+    if (documentFile?.size && txnId) {
+      try { status(feedback, "Expense recorded. Uploading invoice/receipt…"); await uploadDocument({ file: documentFile, documentType: formData.get("document_type") || "receipt", documentDate: formData.get("txn_date"), transactionIds: [txnId] }); }
+      catch (documentError) { status(feedback, `Expense recorded, but the document could not be attached: ${documentError.message}`, true); }
+    }
+>>>>>>> 85113897e4af68fa8c9bb83c5b90664562897551
     if (navigator.onLine) await renderExpensesScreen(screen, user);
   });
 
   screen.addEventListener("click", async (event) => {
     const docButton = event.target.closest(".document-attach");
+<<<<<<< HEAD
     if (docButton) { try { await openDocumentModal({ screen, transactionId: docButton.dataset.txnId, user, onDone: async () => { try { await decorateDocumentCells(screen, [docButton.dataset.txnId], canDo(user, "record_quick_expense")); } catch(error) { console.error(error); } } }); } catch (error) { window.__toast(window.__friendlyError(error.message),{type:"error"}); } return; }
+=======
+    if (docButton) { try { await openDocumentModal({ screen, transactionId: docButton.dataset.txnId, user, onDone: async () => { try { await decorateDocumentCells(screen, [docButton.dataset.txnId], canDo(user, "record_quick_expense")); } catch(error) { console.error(error); } } }); } catch (error) { alert(error.message); } return; }
+>>>>>>> 85113897e4af68fa8c9bb83c5b90664562897551
     const payButton = event.target.closest(".pay-expense-due");
     if (!payButton) return;
     const amount = Number(payButton.dataset.due || 0); const accountOptionsHtml = accountOptions(accounts, ["cash", "bank", "collection_account"]); const mount = document.createElement("div"); mount.className = "document-modal-mount";
