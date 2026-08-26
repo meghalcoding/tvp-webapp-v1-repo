@@ -97,23 +97,33 @@ export async function renderPurchasesScreen(screen,user){
     button.textContent=locked?`Modify ${label}`:`Lock ${label}`;
     button.setAttribute("aria-pressed",String(!locked));
   };
+  const syncRateControl=(input,button,state)=>{
+    const hasMaster=Number(state?.masterRate||0)>0;
+    button.classList.toggle("hidden",!hasMaster);
+    if(!hasMaster){
+      input.disabled=false; input.readOnly=false; input.dataset.locked="false"; input.classList.add("is-editable");
+      state.rateLocked=false;
+      return;
+    }
+    syncInputLock(input,button,"Rate",Boolean(state.rateLocked));
+  };
   const syncRow=row=>{
     const s=row._purchaseState;if(!s)return;
     const rate=row.querySelector("[data-rate]"),gst=row.querySelector("[data-gst-rate]"),qty=row.querySelector("[data-qty]");
     if(rate)rate.value=s.rate===""?"":String(s.rate);
     if(gst)gst.value=s.gstRate===""?"":String(s.gstRate);
     if(qty)qty.value=s.quantity===""?"":String(s.quantity);
-    if(rate)syncInputLock(rate,row.querySelector(".rate-modify"),"Rate",s.rateLocked);
+    if(rate)syncRateControl(rate,row.querySelector(".rate-modify"),s);
     if(gst)syncInputLock(gst,row.querySelector(".gst-modify"),"GST",s.gstLocked);
     calcLine(row);calc();
   };
 
   const attachRowEvents=(row)=>{
     const item=row.querySelector("[data-item]"),search=row.querySelector("[data-item-search]"),qty=row.querySelector("[data-qty]"),rate=row.querySelector("[data-rate]"),gst=row.querySelector("[data-gst-rate]"),rateBtn=row.querySelector(".rate-modify"),gstBtn=row.querySelector(".gst-modify");
-    const chooseItem=(picked)=>{const s=row._purchaseState;if(!picked){item.value="";return;}item.value=picked.id;if(search)search.value=picked.name;s.itemId=picked.id;s.displayName=picked.name;s.unit=picked.unit||"";s.masterRate=Number(picked.master_rate??0);s.masterGstRate=Number(picked.gst_rate??0);s.rate=s.masterRate;s.gstRate=s.masterGstRate;s.rateOverridden=false;s.gstOverridden=false;s.rateLocked=true;s.gstLocked=true;syncRow(row);};
+    const chooseItem=(picked)=>{const s=row._purchaseState;if(!picked){item.value="";return;}item.value=picked.id;if(search)search.value=picked.name;s.itemId=picked.id;s.displayName=picked.name;s.unit=picked.unit||"";s.masterRate=Number(picked.master_rate??0);s.masterGstRate=Number(picked.gst_rate??0);s.rate=s.masterRate>0?s.masterRate:"";s.gstRate=s.masterGstRate;s.rateOverridden=false;s.gstOverridden=false;s.rateLocked=s.masterRate>0;s.gstLocked=true;syncRow(row);};
     if(search)search.addEventListener("input",()=>{const q=search.value.trim().toLowerCase();const picked=(row._itemOptions||[]).find(i=>i.name.toLowerCase()===q);if(picked)chooseItem(picked);else if(!q)item.value="";});
     qty.addEventListener("input",()=>{row._purchaseState.quantity=qty.value===""?"":Number(qty.value);calc();});
-    rate.addEventListener("input",()=>{const s=row._purchaseState;s.rate=rate.value===""?"":Number(rate.value);s.rateOverridden=s.masterRate!==null&&s.rate!==""&&Number(s.rate)!==Number(s.masterRate);calc();});
+    rate.addEventListener("input",()=>{const s=row._purchaseState;s.rate=rate.value===""?"":Number(rate.value);s.rateOverridden=Number(s.masterRate)>0&&s.rate!==""&&Number(s.rate)!==Number(s.masterRate);calc();});
     gst.addEventListener("input",()=>{const s=row._purchaseState;s.gstRate=gst.value===""?"":Number(gst.value);s.gstOverridden=s.masterGstRate!==null&&s.gstRate!==""&&Number(s.gstRate)!==Number(s.masterGstRate);calc();});
     rateBtn.addEventListener("click",()=>{const s=row._purchaseState;s.rateLocked=!s.rateLocked;syncRow(row);if(!s.rateLocked)requestAnimationFrame(()=>{rate.focus();rate.select();});});
     gstBtn.addEventListener("click",()=>{const s=row._purchaseState;s.gstLocked=!s.gstLocked;syncRow(row);if(!s.gstLocked)requestAnimationFrame(()=>{gst.focus();gst.select();});});
@@ -122,7 +132,7 @@ export async function renderPurchasesScreen(screen,user){
 
   const makeStandardRow=()=>{
     const row=document.createElement("div");row.className="purchase-line line-item-row";
-    row.innerHTML=`<div class="item-autocomplete"><input data-item-search list="purchase-item-options" placeholder="Type an item…" autocomplete="off" required><input data-item type="hidden" required></div><input data-qty type="number" min="0.001" step="0.001" placeholder="Qty" required><div class="rate-wrap"><input data-rate type="number" min="0" step="0.01" placeholder="Rate" required disabled><button type="button" class="rate-modify btn btn-small">Modify Rate</button><span class="rate-warning hidden">Rate differs from master</span></div><div class="gst-wrap"><input data-gst-rate type="number" min="0" max="100" step="0.01" placeholder="GST %" required disabled><button type="button" class="gst-modify btn btn-small">Modify GST</button><span class="gst-warning hidden">GST differs from master</span></div><output data-gst-amount>GST ₹0.00</output><output data-line-total>₹0.00</output><button type="button" class="btn btn-small remove-item">×</button>`;
+    row.innerHTML=`<div class="item-autocomplete"><input data-item-search list="purchase-item-options" placeholder="Type an item…" autocomplete="off" required><input data-item type="hidden" required></div><input data-qty type="number" min="0.001" step="0.001" placeholder="Qty" required><div class="rate-wrap"><div class="rate-control"><input data-rate type="number" min="0" step="0.01" placeholder="Rate" required disabled><button type="button" class="rate-modify btn btn-small">Modify Rate</button></div><span class="rate-warning hidden">Rate differs from master</span></div><div class="gst-wrap"><div class="gst-control"><input data-gst-rate type="number" min="0" max="100" step="0.01" placeholder="GST %" required disabled><button type="button" class="gst-modify btn btn-small">Modify GST</button></div><span class="gst-warning hidden">GST differs from master</span></div><output data-gst-amount>GST ₹0.00</output><output data-line-total>₹0.00</output><button type="button" class="btn btn-small remove-item">×</button>`;
     row._purchaseState={itemId:"",displayName:"",unit:"",quantity:"",masterRate:null,rate:"",rateLocked:true,rateOverridden:false,masterGstRate:null,gstRate:"",gstLocked:true,gstOverridden:false};
     row._itemOptions=items;
     attachRowEvents(row);host.append(row);return row;
@@ -133,9 +143,20 @@ export async function renderPurchasesScreen(screen,user){
   const makeTastyRow=(item)=>{
     const row=document.createElement("div");row.className="purchase-line franchise-template-row";
     const rate=itemRate(item),gst=Number(item.gst_rate||0);
-    row._purchaseState={itemId:item.id,displayName:item.name,unit:item.unit||"",quantity:"",masterRate:rate,rate,rateLocked:true,rateOverridden:false,masterGstRate:gst,gstRate:gst,gstLocked:true,gstOverridden:false};
-    row.innerHTML=`<div class="franchise-item-name"><strong>${esc(item.name)}</strong><small>${esc(item.unit||"—")}</small></div><label class="franchise-quantity"><span>Quantity</span><input data-qty type="number" min="0" step="0.001" inputmode="decimal" placeholder="—"></label><output class="franchise-rate">${money(rate)} / ${esc(item.unit||"unit")}</output><output class="franchise-gst">GST ${gst}%</output><output data-gst-amount>GST ₹0.00</output><output data-line-total>₹0.00</output>`;
-    row.querySelector("[data-qty]").addEventListener("input",e=>{row._purchaseState.quantity=e.currentTarget.value===""?"":Number(e.currentTarget.value);calc();});
+    row._purchaseState={itemId:item.id,displayName:item.name,unit:item.unit||"",quantity:"",masterRate:rate,rate:rate>0?rate:"",rateLocked:rate>0,rateOverridden:false,masterGstRate:gst,gstRate:gst,gstLocked:true,gstOverridden:false};
+    row.innerHTML=`<div class="franchise-item-name"><strong>${esc(item.name)}</strong><small>${esc(item.unit||"—")}</small></div>
+      <label class="franchise-quantity"><span>Quantity</span><input data-qty type="number" min="0" step="0.001" inputmode="decimal" placeholder="—"></label>
+      <div class="rate-wrap"><div class="rate-control"><input data-rate type="number" min="0" step="0.01" inputmode="decimal" value="${rate>0?rate:""}" placeholder="Rate" disabled><button type="button" class="rate-modify btn btn-small">Modify Rate</button></div><span class="rate-warning hidden">Rate differs from master</span></div>
+      <div class="gst-wrap"><div class="gst-control"><input data-gst-rate type="number" min="0" max="100" step="0.01" inputmode="decimal" value="${gst}" disabled><button type="button" class="gst-modify btn btn-small">Modify GST</button></div><span class="gst-warning hidden">GST differs from master</span></div>
+      <output data-gst-amount>GST ₹0.00</output><output data-line-total>₹0.00</output>`;
+    const qty=row.querySelector("[data-qty]"),rateInput=row.querySelector("[data-rate]"),gstInput=row.querySelector("[data-gst-rate]");
+    qty.addEventListener("input",e=>{row._purchaseState.quantity=e.currentTarget.value===""?"":Number(e.currentTarget.value);calc();});
+    rateInput.addEventListener("input",e=>{const st=row._purchaseState;st.rate=e.currentTarget.value===""?"":Number(e.currentTarget.value);st.rateOverridden=Number(st.masterRate)>0&&st.rate!==""&&Number(st.rate)!==Number(st.masterRate);calc();});
+    gstInput.addEventListener("input",e=>{const st=row._purchaseState;st.gstRate=e.currentTarget.value===""?"":Number(e.currentTarget.value);st.gstOverridden=Number(st.gstRate)!==Number(st.masterGstRate);calc();});
+    row.querySelector(".rate-modify").addEventListener("click",()=>{const st=row._purchaseState;st.rateLocked=!st.rateLocked;syncInputLock(rateInput,row.querySelector(".rate-modify"),"Rate",st.rateLocked);if(!st.rateLocked)requestAnimationFrame(()=>{rateInput.focus();rateInput.select();});});
+    row.querySelector(".gst-modify").addEventListener("click",()=>{const st=row._purchaseState;st.gstLocked=!st.gstLocked;syncInputLock(gstInput,row.querySelector(".gst-modify"),"GST",st.gstLocked);if(!st.gstLocked)requestAnimationFrame(()=>{gstInput.focus();gstInput.select();});});
+    syncRateControl(rateInput,row.querySelector(".rate-modify"),row._purchaseState);
+    syncInputLock(gstInput,row.querySelector(".gst-modify"),"GST",true);
     host.append(row);return row;
   };
 
@@ -180,7 +201,7 @@ export async function renderPurchasesScreen(screen,user){
           const s = row._purchaseState;
           s.itemId = x.item.id; s.displayName = x.item.name; s.unit = x.item.unit; s.masterRate = Number(x.item.master_rate ?? 0); s.masterGstRate = Number(x.item.gst_rate ?? 0);
           s.quantity = x.quantity ?? "";
-          s.rate = x.useRate && x.rate != null ? x.rate : s.masterRate; s.rateLocked = !(x.useRate && x.rate != null); s.rateOverridden = Number(s.rate) !== Number(s.masterRate);
+          s.rate = x.rate != null && (x.useRate || s.masterRate<=0) ? x.rate : (s.masterRate>0 ? s.masterRate : ""); s.rateLocked = s.masterRate>0 && !(x.useRate && x.rate != null); s.rateOverridden = s.masterRate>0 && s.rate !== "" && Number(s.rate) !== Number(s.masterRate);
           s.gstRate = x.useGst && x.gstRate != null ? x.gstRate : s.masterGstRate; s.gstLocked = !(x.useGst && x.gstRate != null); s.gstOverridden = Number(s.gstRate) !== Number(s.masterGstRate);
           if (currentMode === "standard") { const select = row.querySelector("[data-item]"); if (select) select.value = x.item.id; }
           syncRow(row);
@@ -216,7 +237,7 @@ export async function renderPurchasesScreen(screen,user){
   };
   screen.addEventListener("click",async e=>{
     const orderButton=e.target.closest(".franchise-order-image");
-    if(orderButton){try{orderButton.disabled=true;orderButton.textContent="Preparing…";await drawOrderImage(orderButton.dataset.txnId,orderButton.dataset.date,orderButton.dataset.supplierId);}catch(err){alert(err.message);}finally{orderButton.disabled=false;orderButton.textContent="Order image";}return;}
+    if(orderButton){try{orderButton.disabled=true;orderButton.textContent="Preparing…";await drawOrderImage(orderButton.dataset.txnId,orderButton.dataset.date,orderButton.dataset.supplierId);}catch(err){window.__toast(window.__friendlyError(err),{type:"error"});}finally{orderButton.disabled=false;orderButton.textContent="Order image";}return;}
     const documentButton=e.target.closest(".document-attach");
     if(documentButton){const detail=[...purchases].find(x=>x.id===documentButton.dataset.txnId)?.purchase_details;const d=Array.isArray(detail)?detail[0]:detail;await openDocumentModal({screen,transactionId:documentButton.dataset.txnId,supplierId:d?.supplier_id||null,user,onDone:async()=>{try{await decorateDocumentCells(screen,[documentButton.dataset.txnId],canDo(user,"record_purchase"));}catch(error){console.error(error);}}});}
   });
@@ -229,12 +250,12 @@ export async function renderPurchasesScreen(screen,user){
     if(currentMode==="tasty"&&activeRows.some(r=>!r._purchaseState.itemId)){state(feedback,"One or more selected order items still need item setup. Map them before entering a quantity.",true);return;}
     const lines=activeRows.map(row=>{const s=row._purchaseState;return{item_id:s.itemId,quantity:Number(s.quantity),rate:Number(s.rate),gst_rate:Number(s.gstRate),master_rate_at_entry:Number(s.masterRate??0),master_gst_rate_at_entry:Number(s.masterGstRate??0),rate_overridden:Boolean(s.rateOverridden),gst_rate_overridden:Boolean(s.gstOverridden)};});
     if(!lines.length||lines.some(x=>!x.item_id||!Number.isFinite(x.quantity)||x.quantity<=0||!Number.isFinite(x.rate)||x.rate<0||!Number.isFinite(x.gst_rate)||x.gst_rate<0||x.gst_rate>100)){state(feedback,"Add at least one item with a valid quantity, rate, and GST percentage (0–100%).",true);return;}
-    const rateOverrides=activeRows.map((row,i)=>({line:lines[i],master:Number(row._purchaseState.masterRate),actual:Number(lines[i].rate)})).filter(x=>x.actual!==x.master);
+    const rateOverrides=activeRows.map((row,i)=>({line:lines[i],master:Number(row._purchaseState.masterRate),actual:Number(lines[i].rate)})).filter(x=>x.master>0&&x.actual!==x.master);
     const gstOverrides=activeRows.map((row,i)=>({line:lines[i],master:Number(row._purchaseState.masterGstRate),actual:Number(lines[i].gst_rate)})).filter(x=>x.actual!==x.master);
     let updateMasterRates=false,updateMasterGstRates=false;
-    if(rateOverrides.length&&user.role==="owner")updateMasterRates=window.confirm(`Some purchase rates differ from the master rate.\n\nOK = update master rate(s) from now onward.\nCancel = use the changed rate(s) for this purchase only.`);
-    if(gstOverrides.length&&user.role==="owner")updateMasterGstRates=window.confirm(`Some GST rates differ from the master GST rate.\n\nOK = update master GST rate(s) from now onward.\nCancel = use the changed GST rate(s) for this purchase only.`);
-    if((rateOverrides.length||gstOverrides.length)&&user.role!=="owner")window.alert("Changed rates/GST percentages will apply to this purchase only. Only the Owner can update master values.");
+    if(rateOverrides.length&&user.role==="owner")updateMasterRates=await window.__confirmDialog({title:"Purchase rate differs from master",body:"Choose whether this rate should become the new master rate or apply only to this purchase.",confirmLabel:"Update master rate",cancelLabel:"Use for this purchase only"});
+    if(gstOverrides.length&&user.role==="owner")updateMasterGstRates=await window.__confirmDialog({title:"GST differs from master",body:"Choose whether this GST rate should become the new master GST rate or apply only to this purchase.",confirmLabel:"Update master GST",cancelLabel:"Use for this purchase only"});
+    if((rateOverrides.length||gstOverrides.length)&&user.role!=="owner")window.__toast("Changed rates/GST percentages will apply to this purchase only. Only the Owner can update master values.",{type:"info"});
     state(feedback,"Recording purchase…");
     const documentFile=fd.get("document_file");
     if(documentFile?.size&&!navigator.onLine){state(feedback,"Document uploads require an internet connection. Remove the file or reconnect before recording this purchase.",true);return;}
@@ -274,11 +295,14 @@ function itemMasterForm(screen,user,item=null,draft=null){
   loadMasterRelations().then(rel=>{
     const purchaseSelected=new Set(draft?.purchase_category_ids || (rel.purchaseMap||[]).filter(x=>x.item_id===item?.id).map(x=>x.purchase_category_id));
     const expenseSelected=new Set(draft?.expense_category_ids || (rel.expenseMap||[]).filter(x=>x.item_id===item?.id).map(x=>x.expense_category_id));
-    const linkDropdown=(key,title,options,selected,name)=>`<details class="link-dropdown" ${selected.size?'open':''}><summary>${esc(title)} <span class="link-count">${selected.size?`${selected.size} selected`:"Choose…"}</span></summary><div class="link-dropdown-menu"><div class="link-dropdown-search"><input type="search" placeholder="Search ${esc(title.toLowerCase())}…" data-link-search="${key}" autocomplete="off"></div><div class="link-check-list" data-link-list="${key}">${options.map(o=>`<label class="check-label link-option" data-label="${esc(o.name.toLowerCase())}"><input type="checkbox" name="${name}" value="${o.id}" ${selected.has(o.id)?"checked":""}> ${esc(o.name)}</label>`).join("")||'<span class="muted">No options yet.</span>'}<button type="button" class="btn btn-small add-inline-category" data-category-type="${key}">+ Add new Category</button></div></div></details>`;
+    const linkDropdown=(key,title,options,selected,name)=>`<details class="link-dropdown" ${selected.size?'open':''}><summary>${esc(title)} <span class="link-count">${selected.size?`${selected.size} selected`:"Choose…"}</span></summary><div class="link-dropdown-menu"><div class="link-dropdown-search"><input type="search" placeholder="Search ${esc(title.toLowerCase())}…" data-link-search="${key}" autocomplete="off"></div><div class="link-check-list" data-link-list="${key}">${options.map(o=>`<label class="check-label link-option" data-label="${esc(o.name.toLowerCase())}"><input type="checkbox" name="${name}" value="${o.id}" ${selected.has(o.id)?"checked":""}> ${esc(o.name)}</label>`).join("")||'<span class="muted">No options yet.</span>'}</div><div class="link-dropdown-actions"><button type="button" class="btn btn-small add-inline-category" data-category-type="${key}">+ Add new Category</button><button type="button" class="btn btn-small link-dropdown-done">Done</button></div></div></details>`;
     const values=draft||{};
     mount.innerHTML=`<div class="modal-backdrop"><form class="modal-card" id="item-master-form"><button type="button" class="modal-close">×</button><h2>${item?"Edit item":"New item"}</h2><div class="field"><label>Name</label><input name="name" maxlength="120" required value="${esc(values.name??item?.name??"")}"></div><div class="form-grid"><div class="field"><label>Unit</label><input name="unit" required value="${esc(values.unit??item?.unit??"")}" placeholder="kg, pack, nos"></div><div class="field"><label>Master rate</label><input name="master_rate" type="number" min="0" step="0.01" required value="${values.master_rate??Number(item?.master_rate||0)}"></div><div class="field"><label>GST %</label><input name="gst" type="number" min="0" max="100" step="0.01" required value="${values.gst??Number(item?.gst_rate||0)}"></div><div class="field"><label>Reorder level</label><input name="reorder" type="number" min="0" step="0.001" value="${values.reorder??Number(item?.reorder_level||0)}"></div>${item?`<div class="field"><label>Status</label><select name="active"><option value="true" ${item.active?"selected":""}>Active</option><option value="false" ${!item.active?"selected":""}>Inactive</option></select></div>`:""}</div><div class="relationship-section"><h3>Link To</h3><p class="muted">Sales is intentionally excluded here: sales channels will later contain Menu Items, not fundamental master items.</p><div class="link-dropdown-grid">${linkDropdown("purchase","Purchase",rel.purchaseCategories,purchaseSelected,"purchase_category")}${linkDropdown("expense","Expense",rel.expenseCategories,expenseSelected,"expense_category")}</div></div><div class="form-status"></div><button class="btn btn-primary">${item?"Save changes":"Create item"}</button></form></div>`;
     const form=mount.querySelector('form');
+    const refreshLinkSummary=details=>{const count=details.querySelectorAll('input[type="checkbox"]:checked').length;const countEl=details.querySelector('.link-count');if(countEl)countEl.textContent=count?`${count} selected`:'Choose…';};
     form.querySelectorAll('[data-link-search]').forEach(inp=>inp.addEventListener('input',()=>{const q=inp.value.toLowerCase();form.querySelectorAll(`[data-link-list="${inp.dataset.linkSearch}"] .link-option`).forEach(x=>x.style.display=x.dataset.label.includes(q)?'':'none')}));
+    form.querySelectorAll('.link-dropdown input[type="checkbox"]').forEach(cb=>cb.addEventListener('change',()=>refreshLinkSummary(cb.closest('.link-dropdown'))));
+    form.querySelectorAll('.link-dropdown-done').forEach(btn=>btn.addEventListener('click',()=>btn.closest('.link-dropdown')?.removeAttribute('open')));
     form.querySelector('.modal-close').onclick=()=>mount.innerHTML='';
     form.querySelectorAll('.add-inline-category').forEach(btn=>btn.addEventListener('click',async()=>{
       const current={name:form.elements.name.value,unit:form.elements.unit.value,master_rate:form.elements.master_rate.value,gst:form.elements.gst.value,reorder:form.elements.reorder.value,purchase_category_ids:[...form.querySelectorAll("input[name=\"purchase_category\"]:checked")].map(x=>x.value),expense_category_ids:[...form.querySelectorAll("input[name=\"expense_category\"]:checked")].map(x=>x.value)};

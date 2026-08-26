@@ -90,7 +90,7 @@ export async function renderRelationshipMapsScreen(screen, user) {
     const name=screen.querySelector("#new-exp-item-name")?.value.trim();
     const unit=screen.querySelector("#new-exp-item-unit")?.value.trim()||null;
     const rate=Number(screen.querySelector("#new-exp-item-rate")?.value||0);
-    if(!name){alert("Enter an expense item name.");return;}
+    if(!name){window.__toast(window.__friendlyError("Enter an expense item name."),{type:"error"});return;}
     const {data,error}=await supabase.from("expense_item_catalog").insert({category_id:selectedId,name,unit,default_rate:rate,active:true}).select("id,category_id,name,unit,default_rate,active").single();
     if(error)throw error;
     expenseItems.push(data); selectedExpenseItems.push(data); await loadMapped();
@@ -109,13 +109,13 @@ export async function renderRelationshipMapsScreen(screen, user) {
     targetInput.setAttribute("list","rel-target-list");
     const listId="rel-target-list"; const opts=targets()||[];
     let dl=screen.querySelector("#"+listId); if(dl)dl.outerHTML=datalist(listId,opts);
-    loadMapped().catch(e=>alert(e.message));
+    loadMapped().catch(e=>window.__toast(window.__friendlyError(e.message),{type:"error"}));
   }
 
-  targetInput.addEventListener("change",()=>{const x=targets()?.find(t=>t.name.toLowerCase()===targetInput.value.trim().toLowerCase());if(!x){targetInput.value=targetName();return;}selectedId=x.id;loadMapped().catch(e=>alert(e.message));});
-  searchInput.addEventListener("input",()=>loadMapped().catch(e=>alert(e.message)));
+  targetInput.addEventListener("change",()=>{const x=targets()?.find(t=>t.name.toLowerCase()===targetInput.value.trim().toLowerCase());if(!x){targetInput.value=targetName();return;}selectedId=x.id;loadMapped().catch(e=>window.__toast(window.__friendlyError(e.message),{type:"error"}));});
+  searchInput.addEventListener("input",()=>loadMapped().catch(e=>window.__toast(window.__friendlyError(e.message),{type:"error"})));
   screen.querySelectorAll(".rel-mode").forEach(b=>b.addEventListener("click",()=>setMode(b.dataset.mode)));
-  screen.querySelector("#rel-refresh").onclick=()=>renderRelationshipMapsScreen(screen,user).catch(e=>alert(e.message));
+  screen.querySelector("#rel-refresh").onclick=()=>renderRelationshipMapsScreen(screen,user).catch(e=>window.__toast(window.__friendlyError(e.message),{type:"error"}));
 
   await loadMapped();
 }

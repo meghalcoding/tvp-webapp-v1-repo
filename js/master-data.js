@@ -62,12 +62,132 @@ export async function renderSupplierMasterEnhanced(screen,user){
   screen.querySelectorAll('.edit-supplier-enhanced').forEach(b=>b.onclick=()=>supplierEnhancedForm(screen,user,byId.get(b.dataset.id),rel));
 }
 
-function supplierEnhancedForm(screen,user,supplier,rel,{onCreated}={}){
-  const pcSelected=new Set(rel.supplierPurchase.filter(x=>x.supplier_id===supplier?.id).map(x=>x.purchase_category_id));
-  const fixedSelected=new Set(rel.supplierPurchase.filter(x=>x.supplier_id===supplier?.id&&x.is_fixed).map(x=>x.purchase_category_id));
-  const ecSelected=new Set(rel.supplierExpense.filter(x=>x.supplier_id===supplier?.id).map(x=>x.expense_category_id));
-  modal(screen,`<form class="modal-card" id="supplier-enhanced-form"><button type="button" class="modal-close">×</button><div class="form-eyebrow">MASTER DATA</div><h2>${supplier?'Edit':'New'} Supplier</h2><p class="muted">A supplier only appears in Purchase or Expense when linked to the relevant category.</p><div class="field"><label>Supplier / Vendor name</label><input name="name" required maxlength="120" value="${esc(supplier?.name||'')}" autofocus></div><div class="form-grid"><div class="field"><label>Contact person</label><input name="contact_person" value="${esc(supplier?.contact_person||'')}"></div><div class="field"><label>Phone</label><input name="phone" value="${esc(supplier?.phone||'')}"></div><div class="field"><label>Email</label><input name="email" type="email" value="${esc(supplier?.email||'')}"></div><div class="field"><label>GSTIN</label><input name="gstin" value="${esc(supplier?.gstin||'')}"></div><div class="field field-wide"><label>Address</label><textarea name="address" rows="2">${esc(supplier?.address||'')}</textarea></div>${supplier?`<div class="field"><label>Status</label><select name="active"><option value="true" ${supplier.active?'selected':''}>Active</option><option value="false" ${!supplier.active?'selected':''}>Inactive</option></select></div>`:''}</div><div class="relationship-section"><h3>Link To</h3><div class="link-dropdown-grid supplier-link-grid"><details class="link-dropdown"><summary>Purchase <span class="link-count">${pcSelected.size?`${pcSelected.size} selected`:'Choose…'}</span></summary><div class="link-dropdown-menu"><div class="link-dropdown-search"><input type="search" placeholder="Search Purchase categories…" data-filter="purchase"></div><div class="link-check-list">${rel.purchaseCategories.map(x=>`<div class="supplier-category-row"><label class="check-label link-option" data-label="${esc(x.name.toLowerCase())}"><input type="checkbox" name="purchase_category" value="${x.id}" ${pcSelected.has(x.id)?'checked':''}> ${esc(x.name)}</label><label class="check-label fixed-label"><input type="checkbox" name="fixed_purchase_category" value="${x.id}" ${fixedSelected.has(x.id)?'checked':''}> Fixed</label></div>`).join('')||'<span class="muted">No Purchase categories yet.</span>'}</div></div></details><details class="link-dropdown"><summary>Expense <span class="link-count">${ecSelected.size?`${ecSelected.size} selected`:'Choose…'}</span></summary><div class="link-dropdown-menu"><div class="link-dropdown-search"><input type="search" placeholder="Search Expense categories…" data-filter="expense"></div><div class="link-check-list">${rel.expenseCategories.map(x=>`<label class="check-label link-option" data-label="${esc(x.name.toLowerCase())}"><input type="checkbox" name="expense_category" value="${x.id}" ${ecSelected.has(x.id)?'checked':''}> ${esc(x.name)}</label>`).join('')||'<span class="muted">No Expense categories yet.</span>'}</div></div></details></div><small class="muted">Fixed is only available for Purchase. It means this supplier is automatically selected for that category.</small></div><div class="form-status"></div><button class="btn btn-primary">${supplier?'Save changes':'Create supplier'}</button></form>`);
+function supplierEnhancedForm(screen,user,supplier,rel,{onCreated}={},draft={}){
+  const pcSelected=new Set(draft.purchase_category_ids || rel.supplierPurchase.filter(x=>x.supplier_id===supplier?.id).map(x=>x.purchase_category_id));
+  const fixedSelected=new Set(draft.fixed_purchase_category_ids || rel.supplierPurchase.filter(x=>x.supplier_id===supplier?.id&&x.is_fixed).map(x=>x.purchase_category_id));
+  const ecSelected=new Set(draft.expense_category_ids || rel.supplierExpense.filter(x=>x.supplier_id===supplier?.id).map(x=>x.expense_category_id));
+
+  const linkDropdown=(key,title,options,selected,name,fixed=false)=>`
+    <details class="link-dropdown supplier-link-dropdown" ${selected.size?'open':''}>
+      <summary>${esc(title)} <span class="link-count">${selected.size?`${selected.size} selected`:'Choose…'}</span></summary>
+      <div class="link-dropdown-menu">
+        <div class="link-dropdown-search"><input type="search" placeholder="Search ${esc(title)} categories…" data-filter="${key}" autocomplete="off"></div>
+        <div class="link-check-list" data-link-list="${key}">
+          ${options.map(x=>fixed
+            ? `<div class="supplier-category-row"><label class="check-label link-option" data-label="${esc(x.name.toLowerCase())}"><input type="checkbox" name="purchase_category" value="${x.id}" ${pcSelected.has(x.id)?'checked':''}> ${esc(x.name)}</label><label class="check-label fixed-label"><input type="checkbox" name="fixed_purchase_category" value="${x.id}" ${fixedSelected.has(x.id)?'checked':''}> Fixed</label></div>`
+            : `<label class="check-label link-option" data-label="${esc(x.name.toLowerCase())}"><input type="checkbox" name="expense_category" value="${x.id}" ${ecSelected.has(x.id)?'checked':''}> ${esc(x.name)}</label>`
+          ).join('')||'<span class="muted">No categories yet.</span>'}
+        </div>
+        <div class="link-dropdown-actions">
+          <button type="button" class="btn btn-small add-inline-supplier-category" data-category-type="${key}">+ Add new category</button>
+          <button type="button" class="btn btn-small link-dropdown-done">Done</button>
+        </div>
+      </div>
+    </details>`;
+
+  modal(screen,`<form class="modal-card" id="supplier-enhanced-form">
+    <button type="button" class="modal-close">×</button>
+    <div class="form-eyebrow">MASTER DATA</div>
+    <h2>${supplier?'Edit':'New'} Supplier</h2>
+    <p class="muted">A supplier only appears in Purchase or Expense when linked to the relevant category.</p>
+    <div class="field"><label>Supplier / Vendor name</label><input name="name" required maxlength="120" value="${esc((draft.name ?? supplier?.name ?? ''))}" autofocus></div>
+    <div class="form-grid">
+      <div class="field"><label>Contact person</label><input name="contact_person" value="${esc((draft.contact_person ?? supplier?.contact_person ?? ''))}"></div>
+      <div class="field"><label>Phone</label><input name="phone" value="${esc((draft.phone ?? supplier?.phone ?? ''))}"></div>
+      <div class="field"><label>Email</label><input name="email" type="email" value="${esc((draft.email ?? supplier?.email ?? ''))}"></div>
+      <div class="field"><label>GSTIN</label><input name="gstin" value="${esc((draft.gstin ?? supplier?.gstin ?? ''))}"></div>
+      <div class="field field-wide"><label>Address</label><textarea name="address" rows="2">${esc((draft.address ?? supplier?.address ?? ''))}</textarea></div>
+      ${supplier?`<div class="field"><label>Status</label><select name="active"><option value="true" ${(draft.active??supplier.active)?'selected':''}>Active</option><option value="false" ${!(draft.active??supplier.active)?'selected':''}>Inactive</option></select></div>`:''}
+    </div>
+    <div class="relationship-section">
+      <h3>Link To</h3>
+      <p class="muted">Choose where this supplier is available. Purchase and Expense links are independent.</p>
+      <div class="link-dropdown-grid supplier-link-grid">
+        ${linkDropdown('purchase','Purchase',rel.purchaseCategories,pcSelected,'purchase_category',true)}
+        ${linkDropdown('expense','Expense',rel.expenseCategories,ecSelected,'expense_category',false)}
+      </div>
+      <small class="muted">Fixed is only available for Purchase. It means this supplier is automatically selected for that category.</small>
+    </div>
+    <div class="form-status"></div>
+    <div class="button-row"><button type="button" class="btn modal-close-action">Cancel</button><button class="btn btn-primary">${supplier?'Save changes':'Create supplier'}</button></div>
+  </form>`);
+
   const form=screen.querySelector('#supplier-enhanced-form');
-  form.querySelectorAll('[data-filter]').forEach(inp=>inp.addEventListener('input',()=>{const q=inp.value.toLowerCase();form.querySelectorAll('.link-option').forEach(row=>{const inPurchase=row.closest('details')?.querySelector('[data-filter="purchase"]');const inExpense=row.closest('details')?.querySelector('[data-filter="expense"]');const applies=(inp.dataset.filter==='purchase'&&inPurchase)||(inp.dataset.filter==='expense'&&inExpense);if(applies)row.style.display=row.dataset.label.includes(q)?'':'none';});}));
-  form.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(form);const feedback=form.querySelector('.form-status');const base={p_name:f.get('name').trim(),p_phone:f.get('phone').trim()||null,p_contact_person:f.get('contact_person').trim()||null,p_email:f.get('email').trim()||null,p_address:f.get('address').trim()||null,p_gstin:f.get('gstin').trim()||null};let id=supplier?.id;let error;if(id){({error}=await supabase.rpc('update_supplier_master',{p_supplier_id:id,...base,p_active:f.get('active')==='true'}));}else ({data:id,error}=await supabase.rpc('create_supplier_master',base));if(error){state(feedback,error.message,true);return;}const pids=f.getAll('purchase_category'),eids=f.getAll('expense_category'),fixed=f.getAll('fixed_purchase_category');({error}=await supabase.rpc('set_supplier_category_links',{p_supplier_id:id,p_purchase_category_ids:pids,p_expense_category_ids:eids,p_fixed_purchase_category_ids:fixed}));if(error){state(feedback,error.message,true);return;}screen.querySelector('#master-modal').innerHTML='';if(onCreated) await onCreated(id); else await renderSupplierMasterEnhanced(screen,user);});
+  form.querySelector('.modal-close-action').onclick=()=>screen.querySelector('#master-modal').innerHTML='';
+
+  const refreshSummary=details=>{
+    const count=details.querySelectorAll('input[name="purchase_category"]:checked,input[name="expense_category"]:checked').length;
+    const type=details.querySelector('[data-filter]')?.dataset.filter;
+    const selector=type==='purchase'?'input[name="purchase_category"]:checked':'input[name="expense_category"]:checked';
+    const typeCount=details.querySelectorAll(selector).length;
+    const countEl=details.querySelector('.link-count');
+    if(countEl)countEl.textContent=typeCount?`${typeCount} selected`:'Choose…';
+  };
+
+  form.querySelectorAll('[data-filter]').forEach(inp=>inp.addEventListener('input',()=>{
+    const q=inp.value.toLowerCase();
+    const list=inp.closest('.link-dropdown')?.querySelector('.link-check-list');
+    list?.querySelectorAll('.link-option').forEach(row=>row.style.display=row.dataset.label.includes(q)?'':'none');
+  }));
+  form.querySelectorAll('.link-dropdown input[type="checkbox"]').forEach(cb=>cb.addEventListener('change',()=>refreshSummary(cb.closest('.link-dropdown'))));
+  form.querySelectorAll('.link-dropdown-done').forEach(btn=>btn.addEventListener('click',()=>btn.closest('.link-dropdown')?.removeAttribute('open')));
+
+  form.querySelectorAll('.add-inline-supplier-category').forEach(btn=>btn.addEventListener('click',()=>{
+    const current={
+      name:form.elements.name.value,
+      contact_person:form.elements.contact_person.value,
+      phone:form.elements.phone.value,
+      email:form.elements.email.value,
+      gstin:form.elements.gstin.value,
+      address:form.elements.address.value,
+      active:form.elements.active?.value==='true',
+      purchase_category_ids:[...form.querySelectorAll('input[name="purchase_category"]:checked')].map(x=>x.value),
+      expense_category_ids:[...form.querySelectorAll('input[name="expense_category"]:checked')].map(x=>x.value),
+      fixed_purchase_category_ids:[...form.querySelectorAll('input[name="fixed_purchase_category"]:checked')].map(x=>x.value)
+    };
+    const type=btn.dataset.categoryType;
+    modal(screen,`<form class="modal-card" id="inline-supplier-category-form">
+      <button type="button" class="modal-close">×</button>
+      <div class="form-eyebrow">MASTER DATA</div>
+      <h2>Add ${type==='purchase'?'Purchase':'Expense'} Category</h2>
+      <p class="muted">Create the category and return to the supplier with it selected.</p>
+      <div class="field"><label>Category name</label><input name="name" required maxlength="120" autofocus></div>
+      ${type==='expense'?'<input type="hidden" name="pl_bucket" value="operating">':''}
+      <div class="form-status"></div>
+      <div class="button-row"><button type="button" class="btn modal-close-action">Cancel</button><button class="btn btn-primary">Create and return</button></div>
+    </form>`);
+    const catForm=screen.querySelector('#inline-supplier-category-form');
+    catForm.querySelector('.modal-close-action').onclick=()=>supplierEnhancedForm(screen,user,supplier,rel,{},current);
+    catForm.addEventListener('submit',async e=>{
+      e.preventDefault();
+      const fd=new FormData(catForm),feedback=catForm.querySelector('.form-status');
+      const rpc=type==='purchase'?'create_purchase_category':'create_expense_category';
+      const args=type==='purchase'?{p_name:fd.get('name').trim(),p_sort_order:0}:{p_name:fd.get('name').trim(),p_pl_bucket:fd.get('pl_bucket')};
+      const {data:newId,error}=await supabase.rpc(rpc,args);
+      if(error){state(feedback,error.message,true);return;}
+      const fresh=await loadMasterRelations();
+      if(type==='purchase')current.purchase_category_ids=[...new Set([...current.purchase_category_ids,newId])];
+      else current.expense_category_ids=[...new Set([...current.expense_category_ids,newId])];
+      supplierEnhancedForm(screen,user,supplier,fresh,{},current);
+      requestAnimationFrame(()=>{
+        const details=[...screen.querySelectorAll('#supplier-enhanced-form .link-dropdown')].find(d=>d.querySelector(`[data-filter="${type}"]`));
+        details?.setAttribute('open','');
+      });
+    });
+  }));
+
+  form.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const f=new FormData(form),feedback=form.querySelector('.form-status');
+    const base={p_name:f.get('name').trim(),p_phone:f.get('phone').trim()||null,p_contact_person:f.get('contact_person').trim()||null,p_email:f.get('email').trim()||null,p_address:f.get('address').trim()||null,p_gstin:f.get('gstin').trim()||null};
+    let id=supplier?.id,error;
+    if(id)({error}=await supabase.rpc('update_supplier_master',{p_supplier_id:id,...base,p_active:f.get('active')==='true'}));
+    else ({data:id,error}=await supabase.rpc('create_supplier_master',base));
+    if(error){state(feedback,error.message,true);return;}
+    const pids=f.getAll('purchase_category'),eids=f.getAll('expense_category'),fixed=f.getAll('fixed_purchase_category');
+    ({error}=await supabase.rpc('set_supplier_category_links',{p_supplier_id:id,p_purchase_category_ids:pids,p_expense_category_ids:eids,p_fixed_purchase_category_ids:fixed}));
+    if(error){state(feedback,error.message,true);return;}
+    screen.querySelector('#master-modal').innerHTML='';
+    if(onCreated) await onCreated(id); else await renderSupplierMasterEnhanced(screen,user);
+  });
 }

@@ -98,10 +98,10 @@ async function saveTransfer(event, screen) {
 }
 
 async function reverse(transactionId, screen) {
-  const reason = window.prompt("Reason for this reversal (optional):");
+  const reason = await window.__promptDialog({title:"Reverse transaction",label:"Reason for this reversal (optional)",submitLabel:"Reverse"});
   if (reason === null) return;
   const { error } = await supabase.rpc("reverse_financial_transaction", { p_transaction_id: transactionId, p_reason: reason || null });
-  if (error) { window.alert(`Reversal failed: ${error.message}`); return; }
+  if (error) { window.__toast("Reversal failed. The transaction was not changed.",{type:"error"}); return; }
   await renderTransfersScreen(screen, window.__appUser);
 }
 

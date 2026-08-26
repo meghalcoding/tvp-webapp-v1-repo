@@ -11,76 +11,39 @@ import { renderMasterCategoriesScreen, renderSupplierMasterEnhanced } from "./ma
 import { renderDocumentsScreen } from "./documents.js";
 import { renderMarketplaceImportScreen } from "./marketplace-imports.js";
 import { renderBudgetScreen } from "./budget.js";
+import { toast, confirmDialog, promptDialog, friendlyError, setButtonLoading } from "./ui.js";
 
 // ============================================================================
 // NAV TREE — exactly the structure in spec §15
 // Each item: { path, label, icon, phase } — phase is shown on not-yet-built
 // screens so the team always knows what's real vs. planned.
 // ============================================================================
+const ICONS = {
+  dashboard:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+  sales:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h9l3 3v17H6z"/><path d="M15 2v4h4M9 11h6M9 15h6M9 19h4"/></svg>',
+  purchases:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18M5 5l1 15h12l1-15M9 9v7M15 9v7"/></svg>',
+  expenses:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18H5zM8 7h8M8 11h8M8 15h5"/></svg>',
+  inventory:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7M12 11v10"/></svg>',
+  closing:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg>',
+  money:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M3 9h2M19 9h2"/></svg>',
+  ledger:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg>',
+  upi:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10M17 7l-3-3M17 7l-3 3M17 17H7M7 17l3-3M7 17l3 3"/></svg>',
+  supplier:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5l8-2 8 2v16M4 9h16M8 13h2M14 13h2M8 17h2M14 17h2"/></svg>',
+  documents:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6zM15 3v4h4M9 12h6M9 16h6"/></svg>',
+  report:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+  masters:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/><path d="M10 10l4 4"/></svg>',
+  admin:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2 2 3-.3.8 2.9 2.5 1.5-1.2 2.7 1.2 2.7-2.5 1.5-.8 2.9-3-.3-2 2-2-2-3 .3-.8-2.9-2.5-1.5 1.2-2.7-1.2-2.7 2.5-1.5.8-2.9 3 .3z"/><circle cx="12" cy="12" r="3"/></svg>',
+  more:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>'
+};
 const NAV = [
-  { group: null, items: [{ path: "dashboard", label: "Dashboard", icon: "▣" }] },
-  {
-    group: "Operations",
-    items: [
-      { path: "sales", label: "Sales", icon: "₹" },
-      { path: "marketplace-imports", label: "Marketplace Imports", icon: "⇩" },
-      { path: "budget", label: "Budget & Forecasting", icon: "◫" },
-      { path: "purchases", label: "Purchases", icon: "▤" },
-      { path: "expenses", label: "Expenses", icon: "✎" },
-      { path: "inventory", label: "Inventory", icon: "▦" },
-      { path: "wastage", label: "Wastage", icon: "✕" },
-      { path: "daily-closing", label: "Daily Closing", icon: "✓" },
-    ],
-  },
-  {
-    group: "Money",
-    items: [
-      { path: "accounts", label: "Cash & Accounts", icon: "$" },
-      { path: "ledger", label: "Transaction Ledger", icon: "≡" },
-      { path: "upi", label: "UPI Reconciliation", icon: "⇄" },
-      { path: "transfers", label: "Transfers", icon: "→" },
-      { path: "supplier-dues", label: "Supplier Dues", icon: "⌘" },
-      { path: "documents", label: "Documents", icon: "▣" },
-    ],
-  },
-  {
-    group: "Reports",
-    items: [
-      { path: "report-daily", label: "Daily Report", icon: "▤" },
-      { path: "report-sales", label: "Sales Report", icon: "▤" },
-      { path: "report-purchase", label: "Purchase Report", icon: "▤" },
-      { path: "report-expense", label: "Expense Report", icon: "▤" },
-      { path: "report-stock", label: "Stock Report", icon: "▤" },
-      { path: "report-pl", label: "P&L", icon: "▤" },
-      { path: "report-gst", label: "GST Summary", icon: "▤" },
-      { path: "report-upi", label: "UPI Report", icon: "▤" },
-      { path: "report-suppliers", label: "Supplier Balances", icon: "▤" },
-    ],
-  },
-  {
-    group: "Masters",
-    items: [
-      { path: "master-items", label: "Items", icon: "•" },
-      { path: "master-relations", label: "Item Relationships", icon: "↔" },
-      { path: "master-suppliers", label: "Suppliers", icon: "•" },
-      { path: "master-categories", label: "Categories", icon: "•" },
-      { path: "master-accounts", label: "Accounts", icon: "•" },
-      { path: "master-users", label: "Users", icon: "•", phase: "Phase 2 — Financial Engine" },
-    ],
-  },
-  {
-    group: "System",
-    items: [
-      { path: "automation", label: "Automation", icon: "*" },
-      { path: "backup", label: "Backup", icon: "⇩" },
-      { path: "audit-log", label: "Audit Log", icon: "≡" },
-      { path: "settings", label: "Settings", icon: "⚙" },
-    ],
-  },
+ {group:'Overview', items:[{path:'dashboard',label:'Dashboard',icon:'dashboard'}]},
+ {group:'Operations', items:[{path:'sales',label:'Sales',icon:'sales'},{path:'purchases',label:'Purchases',icon:'purchases'},{path:'expenses',label:'Expenses',icon:'expenses'},{path:'inventory',label:'Inventory',icon:'inventory'},{path:'daily-closing',label:'Daily Closing',icon:'closing'},{path:'marketplace-imports',label:'Marketplace Imports',icon:'purchases',secondary:true},{path:'budget',label:'Budget & Forecasting',icon:'ledger',secondary:true},{path:'wastage',label:'Wastage',icon:'expenses',secondary:true}]},
+ {group:'Money', items:[{path:'accounts',label:'Cash & Accounts',icon:'money'},{path:'ledger',label:'Transaction Ledger',icon:'ledger'},{path:'upi',label:'UPI Reconciliation',icon:'upi'},{path:'supplier-dues',label:'Supplier Dues',icon:'supplier'},{path:'transfers',label:'Transfers',icon:'money',secondary:true},{path:'documents',label:'Documents',icon:'documents',secondary:true}]},
+ {group:'Insights', items:[{path:'reports',label:'Reports',icon:'report'}]},
+ {group:'Admin', items:[{path:'master-categories',label:'Categories',icon:'masters'},{path:'master-items',label:'Items',icon:'masters'},{path:'master-suppliers',label:'Suppliers',icon:'supplier'},{path:'master-relations',label:'Item Relationships',icon:'masters',secondary:true},{path:'master-accounts',label:'Accounts',icon:'money',secondary:true},{path:'master-users',label:'Users',icon:'admin',secondary:true},{path:'automation',label:'Automation',icon:'admin',secondary:true},{path:'backup',label:'Backup',icon:'documents',secondary:true},{path:'audit-log',label:'Audit Log',icon:'ledger',secondary:true},{path:'settings',label:'Settings',icon:'admin',secondary:true}]},
 ];
-const ALL_ITEMS = NAV.flatMap((g) => g.items);
-const BOTTOM_NAV_PATHS = ["dashboard", "sales", "expenses", "backup"]; // "More" covers the rest on mobile
-
+const ALL_ITEMS = NAV.flatMap(g => g.items);
+const BOTTOM_NAV_PATHS = ['dashboard','sales','expenses','purchases'];
 let currentAppUser = null;
 
 // ============================================================================
@@ -161,18 +124,20 @@ function wireLoginForm() {
       errEl.textContent = "Supabase isn't connected yet — set SUPABASE_URL / SUPABASE_ANON_KEY in js/config.js.";
       return;
     }
+    const submit = e.currentTarget.querySelector("button[type=submit]");
+    setButtonLoading(submit, true, "Signing in…");
     try {
       await signIn(email, password);
     } catch (err) {
       console.error("Sign-in failed:", err);
-      errEl.textContent = err.message || err.error_description || "Sign-in failed.";
-    }
+      errEl.textContent = "Sign-in failed. Check your email and password and try again.";
+    } finally { setButtonLoading(submit, false); }
   });
 }
 
 function renderUserBadges() {
   const html = `${currentAppUser.name} <span class="role-pill">${currentAppUser.role}</span>
-    <button class="btn" id="logout-btn" style="padding:3px 9px;font-size:0.75rem;">Sign out</button>`;
+    <button class="btn btn-small btn-ghost" id="logout-btn">Sign out</button>`;
   document.getElementById("topbar-user-badge").innerHTML = html;
   document.getElementById("desktop-user-badge").innerHTML = html;
   document.querySelectorAll("#logout-btn").forEach((b) => b.addEventListener("click", () => signOut()));
@@ -182,46 +147,22 @@ function renderUserBadges() {
 // NAV RENDERING
 // ============================================================================
 function renderNav() {
-  const sidebar = document.getElementById("sidebar-nav");
-  sidebar.innerHTML = NAV.map(
-    (group) => `
-    <div class="nav-group">
-      ${group.group ? `<div class="nav-group-label">${group.group}</div>` : ""}
-      ${group.items.map(navLinkHtml).join("")}
-    </div>`
-  ).join("");
-
-  const bottom = document.getElementById("bottom-nav");
-  const bottomItems = ALL_ITEMS.filter((i) => BOTTOM_NAV_PATHS.includes(i.path));
-  bottomItems.push({ path: "more", label: "More", icon: "☰" });
-  bottom.innerHTML = bottomItems.map(navLinkHtml).join("");
-
-  document.querySelectorAll(".nav-link").forEach((el) => {
-    el.addEventListener("click", (e) => {
-      e.preventDefault();
-      const path = el.dataset.path;
-      if (path === "more") {
-        // simplest mobile "more" behaviour for the foundation phase: jump to
-        // Reports index-ish screen (a full drawer can be added in a later pass)
-        location.hash = "#/master-items";
-      } else {
-        location.hash = `#/${path}`;
-      }
-    });
-  });
+  const sidebar = document.getElementById('sidebar-nav');
+  sidebar.innerHTML = `<div class="nav-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="nav-search" type="search" placeholder="Search menu…" aria-label="Search menu"></div>` + NAV.map((group, gi) => `
+    <section class="nav-group ${gi ? '' : 'nav-group-first'}" data-nav-group="${group.group}">
+      <button type="button" class="nav-group-toggle" aria-expanded="true"><span>${group.group}</span><span class="nav-chevron">⌄</span></button>
+      <div class="nav-group-items">${group.items.map(navLinkHtml).join('')}</div>
+    </section>`).join('');
+  sidebar.querySelectorAll('.nav-group-toggle').forEach(btn => btn.addEventListener('click', () => { const expanded = btn.getAttribute('aria-expanded') === 'true'; btn.setAttribute('aria-expanded', String(!expanded)); btn.closest('.nav-group').classList.toggle('is-collapsed', expanded); }));
+  sidebar.querySelector('#nav-search')?.addEventListener('input', e => { const q = e.target.value.trim().toLowerCase(); sidebar.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('nav-hidden', q && !a.textContent.toLowerCase().includes(q))); sidebar.querySelectorAll('.nav-group').forEach(g => { const visible = [...g.querySelectorAll('.nav-link')].some(a => !a.classList.contains('nav-hidden')); g.classList.toggle('nav-search-empty', !visible); if(q && visible) g.classList.remove('is-collapsed'); }); });
+  const navSearch=sidebar.querySelector('#nav-search'); window.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();navSearch?.focus();navSearch?.select();}});
+  sidebar.querySelectorAll('.nav-group').forEach(group => { const items = group.querySelectorAll('.nav-link.secondary'); if(items.length) { const more = document.createElement('button'); more.type='button'; more.className='nav-show-more'; more.textContent='Show more'; more.addEventListener('click',()=>{ group.classList.toggle('show-secondary'); more.textContent=group.classList.contains('show-secondary')?'Show less':'Show more'; }); group.querySelector('.nav-group-items').appendChild(more); } });
+  const bottom = document.getElementById('bottom-nav');
+  bottom.innerHTML = BOTTOM_NAV_PATHS.map(path => navLinkHtml(ALL_ITEMS.find(i=>i.path===path))).join('') + navLinkHtml({path:'more',label:'More',icon:'more'});
+  document.querySelectorAll('.nav-link').forEach(el => el.addEventListener('click', e => { e.preventDefault(); const path=el.dataset.path; location.hash = `#/${path}`; }));
 }
-
-function navLinkHtml(item) {
-  return `<a href="#/${item.path}" class="nav-link" data-path="${item.path}">
-    <span class="icon">${item.icon}</span><span class="label">${item.label}</span>
-  </a>`;
-}
-
-function setActiveNav(path) {
-  document.querySelectorAll(".nav-link").forEach((el) => {
-    el.classList.toggle("active", el.dataset.path === path);
-  });
-}
+function navLinkHtml(item) { return `<a href="#/${item.path}" class="nav-link ${item.secondary?'secondary':''}" data-path="${item.path}"><span class="icon">${ICONS[item.icon] || ICONS.masters}</span><span class="label">${item.label}</span></a>`; }
+function setActiveNav(path) { const active = path === 'reports' || path.startsWith('report-') ? 'reports' : path; document.querySelectorAll('.nav-link').forEach(el => el.classList.toggle('active', el.dataset.path === active)); }
 
 // ============================================================================
 // ROUTER
@@ -271,13 +212,15 @@ async function renderRoute() {
     "report-gst": renderGstReport,
     "report-upi": renderUpiReport,
     "report-suppliers": renderSupplierReport,
+    reports: renderReportsHub,
+    more: renderMoreScreen,
   };
 
   if (renderers[path]) {
     try {
       await renderers[path](screen);
     } catch (err) {
-      screen.innerHTML = `<div class="placeholder-screen"><h2>Something went wrong</h2><p>${err.message}</p></div>`;
+      screen.innerHTML = `<div class="placeholder-screen"><h2>Something went wrong</h2><p>${friendlyError(err)}</p></div>`;
     }
     return;
   }
@@ -338,9 +281,10 @@ async function renderDashboard(screen) {
   const todayStats = await dashboardToday();
 
   screen.innerHTML = `
+    <div class="dashboard-hero card"><div><span class="eyebrow">Today</span><h1>Net cash position</h1><strong class="hero-number">₹${fmt(Number(cash?.balance||0) + Number(bank?.balance||0) + Number(upiPendingTotal||0))}</strong><p class="muted">Cash, bank and pending UPI settlement.</p></div></div>
     <div class="grid grid-2">
       <div class="card">
-        <div class="card-title">Today</div>
+        <div class="card-title">Today at a glance</div>
         <div class="stat-row"><span class="stat-label">Sales</span><span class="stat-value positive">₹${fmt(todayStats?.sales)}</span></div>
         <div class="stat-row"><span class="stat-label">Expenses</span><span class="stat-value negative">₹${fmt(todayStats?.expenses)}</span></div>
         <div class="stat-row"><span class="stat-label">Purchases</span><span class="stat-value">₹${fmt(todayStats?.purchases)}</span></div>
@@ -377,27 +321,24 @@ async function renderDashboard(screen) {
         : emptyRow("Nothing low yet — items appear here once purchases are recorded (Phase 4).")}
     </div>
 
-    <div class="card">
-      <div class="card-title">Quick Actions</div>
-      <div class="fab-row">
-        <button class="btn btn-primary" id="quick-sale">+ Sale</button>
-        <button class="btn btn-primary" id="quick-purchase">+ Purchase</button>
-        <button class="btn btn-primary" id="quick-expense">+ Expense</button>
-        <button class="btn" id="quick-transfer">+ Money Transfer</button>
-        <button class="btn" id="quick-inventory">+ Stock Adjustment</button>
-        <button class="btn" id="quick-closing">+ Daily Closing</button>
-      </div>
-      <p style="font-size:0.78rem;color:var(--steel);margin-top:10px;margin-bottom:0;">
-        Quick Actions are wired up to their real forms starting Phase 2. This dashboard already reads
-        live data from Supabase — try recording a row directly in the Supabase table editor to see it appear here.
-      </p>
+    <div class="card quick-actions-card">
+      <div class="card-title">Quick actions</div>
+      <div class="quick-actions"><button class="btn btn-primary" id="quick-new">+ New</button><div class="quick-action-menu hidden" id="quick-menu"><a href="#/sales">Sale</a><a href="#/purchases">Purchase</a><a href="#/expenses">Expense</a><a href="#/transfers">Money transfer</a><a href="#/inventory">Stock adjustment</a><a href="#/daily-closing">Daily closing</a></div></div>
     </div>`;
-  document.getElementById("quick-transfer")?.addEventListener("click", () => { location.hash = "#/transfers"; });
-  document.getElementById("quick-sale")?.addEventListener("click", () => { location.hash = "#/sales"; });
-  document.getElementById("quick-expense")?.addEventListener("click", () => { location.hash = "#/expenses"; });
-  document.getElementById("quick-closing")?.addEventListener("click", () => { location.hash = "#/daily-closing"; });
-  document.getElementById("quick-purchase")?.addEventListener("click", () => { location.hash = "#/purchases"; });
-  document.getElementById("quick-inventory")?.addEventListener("click", () => { location.hash = "#/inventory"; });
+  document.getElementById("quick-new")?.addEventListener("click", () => document.getElementById("quick-menu")?.classList.toggle("hidden"));
+}
+
+function renderMoreScreen(screen) {
+  screen.innerHTML=`<div class="screen-head"><div><h1>More</h1><p>Everything else, grouped the same way as the desktop navigation.</p></div></div><div class="more-grid">${NAV.filter(g=>g.group!=='Overview').map(g=>`<section class="card more-section"><h2>${g.group}</h2><div class="more-links">${g.items.map(i=>`<a href="#/${i.path}" class="more-link"><span class="icon">${ICONS[i.icon]||ICONS.masters}</span><span>${i.label}</span></a>`).join('')}</div></section>`).join('')}</div>`;
+}
+
+async function renderReportsHub(screen) {
+  const tabs=[['report-daily','Daily'],['report-sales','Sales'],['report-purchase','Purchase'],['report-expense','Expense'],['report-stock','Stock'],['report-pl','P&L'],['report-gst','GST'],['report-upi','UPI'],['report-suppliers','Suppliers']];
+  screen.innerHTML=`<div class="screen-head"><div><h1>Reports</h1><p>Choose a report without leaving the reporting workspace.</p></div></div><div class="segmented-tabs" role="tablist">${tabs.map((t,i)=>`<button class="segmented-tab ${i===0?'active':''}" data-report="${t[0]}" role="tab">${t[1]}</button>`).join('')}</div><div id="report-panel" class="report-panel"></div>`;
+  const panel=screen.querySelector('#report-panel');
+  const renderers={ 'report-daily':renderDailyReport,'report-sales':renderSalesReport,'report-purchase':renderPurchaseReport,'report-expense':renderExpenseReport,'report-stock':renderStockReport,'report-pl':renderPlReport,'report-gst':renderGstReport,'report-upi':renderUpiReport,'report-suppliers':renderSupplierReport };
+  const load=async path=>{screen.querySelectorAll('.segmented-tab').forEach(b=>b.classList.toggle('active',b.dataset.report===path)); panel.innerHTML='<div class="loading-state">Loading report…</div>'; await renderers[path](panel);};
+  screen.querySelectorAll('.segmented-tab').forEach(b=>b.addEventListener('click',()=>load(b.dataset.report))); await load('report-daily');
 }
 
 function notConfiguredCard() {
