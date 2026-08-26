@@ -50,7 +50,7 @@ export async function renderPurchasesScreen(screen,user){
   let currentMode="standard";
   let currentTemplate=[];
 
-  screen.innerHTML=`<div class="screen-head"><div><h1>Purchases</h1><p>Itemized purchases add stock automatically; unpaid value remains in supplier dues.</p></div></div>${allowed?`<div class="card"><div class="card-title">New purchase</div><form id="purchase-form"><div class="form-grid"><div class="field"><label>Supplier</label><select name="supplier_id" required><option value="">Choose supplier</option>${optionRows(suppliers)}</select></div><div class="field"><label>Payment</label><select name="paid_from_account_id"><option value="">Unpaid — add to supplier dues</option>${optionRows(accounts.filter(a=>["cash","bank","collection_account"].includes(a.type)))}</select></div><div class="field"><label>Date</label><input name="txn_date" type="date" value="${today()}" required></div><div class="field"><label>Bill note (optional)</label><input name="description" maxlength="500"></div><div class="field"><label>Document type</label><select name="document_type"><option value="invoice">Invoice</option><option value="receipt">Receipt</option><option value="bill">Bill</option><option value="other">Other</option></select></div><div class="field"><label>Invoice / receipt (optional)</label><input name="document_file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp"><button type="button" class="btn btn-small document-ocr-button hidden" id="purchase-ocr-button">Extract from document</button><small>PDF/JPG/PNG/WEBP · max 10 MB. You can attach it later from Recent purchases.</small></div></div><div id="purchase-mode-note"></div><div class="card-title">Purchase items</div><div id="purchase-lines" class="line-items"></div><div id="purchase-order-summary"></div><button type="button" class="btn btn-small" id="add-purchase-line">+ Add item</button><p class="purchase-total">Purchase total: <strong id="purchase-total">₹0.00</strong></p><div class="form-status"></div><button class="btn btn-primary">Record purchase</button></form></div>`:""}<div class="card table-wrap"><div class="card-title">Recent purchases</div><table class="ledger"><thead><tr><th>Date</th><th>Supplier</th><th>Items</th><th>Payment</th><th>Note</th><th class="num">Total</th><th>Document</th><th></th></tr></thead><tbody id="purchases-history-body"></tbody></table><div class="history-controls" id="purchases-history-controls"></div></div>`;
+  screen.innerHTML=`<div class="screen-head"><div><h1>Purchases</h1><p>Itemized purchases add stock automatically; unpaid value remains in supplier dues.</p></div></div>${allowed?`<div class="card"><div class="card-title">New purchase</div><form id="purchase-form"><datalist id="purchase-item-options">${items.map(i=>`<option value="${esc(i.name)}">${esc(i.unit)}</option>`).join("")}</datalist><div class="form-grid"><div class="field"><label>Supplier</label><select name="supplier_id" required><option value="">Choose supplier</option>${optionRows(suppliers)}</select></div><div class="field"><label>Payment</label><select name="paid_from_account_id"><option value="">Unpaid — add to supplier dues</option>${optionRows(accounts.filter(a=>["cash","bank","collection_account"].includes(a.type)))}</select></div><div class="field"><label>Date</label><input name="txn_date" type="date" value="${today()}" required></div><div class="field"><label>Bill note (optional)</label><input name="description" maxlength="500"></div><div class="field"><label>Document type</label><select name="document_type"><option value="invoice">Invoice</option><option value="receipt">Receipt</option><option value="bill">Bill</option><option value="other">Other</option></select></div><div class="field"><label>Invoice / receipt (optional)</label><input name="document_file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp"><button type="button" class="btn btn-small document-ocr-button hidden" id="purchase-ocr-button">Extract from document</button><small>PDF/JPG/PNG/WEBP · max 10 MB. You can attach it later from Recent purchases.</small></div></div><div id="purchase-mode-note"></div><div class="card-title">Purchase items</div><div id="purchase-lines" class="line-items"></div><div id="purchase-order-summary"></div><button type="button" class="btn btn-small" id="add-purchase-line">+ Add item</button><p class="purchase-total">Purchase total: <strong id="purchase-total">₹0.00</strong></p><div class="form-status"></div><button class="btn btn-primary">Record purchase</button></form></div>`:""}<div class="card table-wrap"><div class="card-title">Recent purchases</div><table class="ledger"><thead><tr><th>Date</th><th>Supplier</th><th>Items</th><th>Payment</th><th>Note</th><th class="num">Total</th><th>Document</th><th></th></tr></thead><tbody id="purchases-history-body"></tbody></table><div class="history-controls" id="purchases-history-controls"></div></div>`;
 
   const renderHistoryRow=p=>{
     const d=Array.isArray(p.purchase_details)?p.purchase_details[0]:p.purchase_details;
@@ -110,12 +110,8 @@ export async function renderPurchasesScreen(screen,user){
 
   const attachRowEvents=(row)=>{
     const item=row.querySelector("[data-item]"),search=row.querySelector("[data-item-search]"),qty=row.querySelector("[data-qty]"),rate=row.querySelector("[data-rate]"),gst=row.querySelector("[data-gst-rate]"),rateBtn=row.querySelector(".rate-modify"),gstBtn=row.querySelector(".gst-modify");
-    if(search)search.addEventListener("input",()=>{const q=search.value.toLowerCase();[...item.options].forEach(o=>{if(!o.value)return;o.hidden=!o.text.toLowerCase().includes(q);});});
-    if(item)item.addEventListener("change",()=>{
-      const o=item.selectedOptions[0],s=row._purchaseState;
-      s.itemId=o?.value||"";if(search)search.value=o?.textContent?.trim()||"";s.displayName=o?.dataset.displayName||o?.textContent?.trim()||"";s.unit=o?.dataset.unit||"";
-      s.masterRate=o?.value?Number(o.dataset.masterRate||0):null;s.masterGstRate=o?.value?Number(o.dataset.masterGst||0):null;s.rate=o?.value?s.masterRate:"";s.gstRate=o?.value?s.masterGstRate:"";s.rateOverridden=false;s.gstOverridden=false;s.rateLocked=true;s.gstLocked=true;syncRow(row);
-    });
+    const chooseItem=(picked)=>{const s=row._purchaseState;if(!picked){item.value="";return;}item.value=picked.id;if(search)search.value=picked.name;s.itemId=picked.id;s.displayName=picked.name;s.unit=picked.unit||"";s.masterRate=Number(picked.master_rate??0);s.masterGstRate=Number(picked.gst_rate??0);s.rate=s.masterRate;s.gstRate=s.masterGstRate;s.rateOverridden=false;s.gstOverridden=false;s.rateLocked=true;s.gstLocked=true;syncRow(row);};
+    if(search)search.addEventListener("input",()=>{const q=search.value.trim().toLowerCase();const picked=(row._itemOptions||[]).find(i=>i.name.toLowerCase()===q);if(picked)chooseItem(picked);else if(!q)item.value="";});
     qty.addEventListener("input",()=>{row._purchaseState.quantity=qty.value===""?"":Number(qty.value);calc();});
     rate.addEventListener("input",()=>{const s=row._purchaseState;s.rate=rate.value===""?"":Number(rate.value);s.rateOverridden=s.masterRate!==null&&s.rate!==""&&Number(s.rate)!==Number(s.masterRate);calc();});
     gst.addEventListener("input",()=>{const s=row._purchaseState;s.gstRate=gst.value===""?"":Number(gst.value);s.gstOverridden=s.masterGstRate!==null&&s.gstRate!==""&&Number(s.gstRate)!==Number(s.masterGstRate);calc();});
@@ -126,9 +122,21 @@ export async function renderPurchasesScreen(screen,user){
 
   const makeStandardRow=()=>{
     const row=document.createElement("div");row.className="purchase-line line-item-row";
-    row.innerHTML=`<div class="search-picker"><input data-item-search placeholder="Search item…" autocomplete="off"><select data-item required><option value="">Item</option>${items.map(i=>`<option value="${i.id}" data-master-rate="${Number(i.master_rate??0)}" data-master-gst="${Number(i.gst_rate??0)}" data-unit="${esc(i.unit)}">${esc(i.name)} (${esc(i.unit)})</option>`).join("")}</select></div><input data-qty type="number" min="0.001" step="0.001" placeholder="Qty" required><div class="rate-wrap"><input data-rate type="number" min="0" step="0.01" placeholder="Rate" required disabled><button type="button" class="rate-modify btn btn-small">Modify Rate</button><span class="rate-warning hidden">Rate differs from master</span></div><div class="gst-wrap"><input data-gst-rate type="number" min="0" max="100" step="0.01" placeholder="GST %" required disabled><button type="button" class="gst-modify btn btn-small">Modify GST</button><span class="gst-warning hidden">GST differs from master</span></div><output data-gst-amount>GST ₹0.00</output><output data-line-total>₹0.00</output><button type="button" class="btn btn-small remove-item">×</button>`;
+    row.innerHTML=`<div class="item-autocomplete"><input data-item-search list="purchase-item-options" placeholder="Type an item…" autocomplete="off" required><input data-item type="hidden" required></div><input data-qty type="number" min="0.001" step="0.001" placeholder="Qty" required><div class="rate-wrap"><input data-rate type="number" min="0" step="0.01" placeholder="Rate" required disabled><button type="button" class="rate-modify btn btn-small">Modify Rate</button><span class="rate-warning hidden">Rate differs from master</span></div><div class="gst-wrap"><input data-gst-rate type="number" min="0" max="100" step="0.01" placeholder="GST %" required disabled><button type="button" class="gst-modify btn btn-small">Modify GST</button><span class="gst-warning hidden">GST differs from master</span></div><output data-gst-amount>GST ₹0.00</output><output data-line-total>₹0.00</output><button type="button" class="btn btn-small remove-item">×</button>`;
     row._purchaseState={itemId:"",displayName:"",unit:"",quantity:"",masterRate:null,rate:"",rateLocked:true,rateOverridden:false,masterGstRate:null,gstRate:"",gstLocked:true,gstOverridden:false};
+    row._itemOptions=items;
     attachRowEvents(row);host.append(row);return row;
+  };
+
+  // Franchise purchases are a fixed daily-order list: the operator only enters
+  // quantities, while the item, rate and GST always come from the master item.
+  const makeTastyRow=(item)=>{
+    const row=document.createElement("div");row.className="purchase-line franchise-template-row";
+    const rate=itemRate(item),gst=Number(item.gst_rate||0);
+    row._purchaseState={itemId:item.id,displayName:item.name,unit:item.unit||"",quantity:"",masterRate:rate,rate,rateLocked:true,rateOverridden:false,masterGstRate:gst,gstRate:gst,gstLocked:true,gstOverridden:false};
+    row.innerHTML=`<div class="franchise-item-name"><strong>${esc(item.name)}</strong><small>${esc(item.unit||"—")}</small></div><label class="franchise-quantity"><span>Quantity</span><input data-qty type="number" min="0" step="0.001" inputmode="decimal" placeholder="—"></label><output class="franchise-rate">${money(rate)} / ${esc(item.unit||"unit")}</output><output class="franchise-gst">GST ${gst}%</output><output data-gst-amount>GST ₹0.00</output><output data-line-total>₹0.00</output>`;
+    row.querySelector("[data-qty]").addEventListener("input",e=>{row._purchaseState.quantity=e.currentTarget.value===""?"":Number(e.currentTarget.value);calc();});
+    host.append(row);return row;
   };
 
   const loadSupplierMode=async supplierId=>{
@@ -144,15 +152,15 @@ export async function renderPurchasesScreen(screen,user){
       if(categoryItems.length){
         currentMode='tasty'; addButton.style.display='none';
         modeNote.innerHTML=`<div class="franchise-order-banner"><strong>${esc(category?.name||'Category')} purchase</strong><span>Enter only the quantities you are ordering today. Blank quantities will not be recorded.</span></div>`;
-        categoryItems.forEach((item)=>makeTastyRow({id:item.id,display_name:item.name,abbreviation:'',items:item},0));calc();return;
+        categoryItems.forEach(makeTastyRow);calc();return;
       }
     }
     const supplierItemIds=new Set(links.flatMap(x=>[...itemIdsForPurchaseCategory(masterRelations,x.purchase_category_id)]));
     const allowedItems=items.filter(i=>supplierItemIds.has(i.id));
     makeStandardRow();
     // Replace the standard row's item list with supplier/category-scoped items when available.
-    const select=host.querySelector('[data-item]');
-    if(select && allowedItems.length) select.innerHTML=`<option value="">Item</option>${allowedItems.map(i=>`<option value="${i.id}" data-master-rate="${Number(i.master_rate??0)}" data-master-gst="${Number(i.gst_rate??0)}" data-unit="${esc(i.unit)}">${esc(i.name)} (${esc(i.unit)})</option>`).join('')}`;
+    const row=host.querySelector('.purchase-line');
+    if(row && allowedItems.length){row._itemOptions=allowedItems;screen.querySelector('#purchase-item-options').innerHTML=allowedItems.map(i=>`<option value="${esc(i.name)}">${esc(i.unit)}</option>`).join('');}
     calc();
   };
 
