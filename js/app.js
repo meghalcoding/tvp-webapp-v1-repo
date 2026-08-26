@@ -4,9 +4,10 @@ import { exportFullBackup, exportModuleBackups } from "./backup.js";
 import { getPendingCount, syncOutbox } from "./offline-queue.js";
 import { renderAccountsScreen, renderTransfersScreen, renderLedgerScreen, renderAuditLogScreen } from "./financial-engine.js";
 import { renderSalesScreen, renderExpensesScreen, renderUpiScreen, renderDailyClosingScreen } from "./daily-operations.js";
-import { renderPurchasesScreen, renderInventoryScreen, renderItemMasterScreen, renderWastageScreen, renderSupplierDuesScreen, renderSupplierMasterScreen } from "./procurement-inventory.js";
+import { renderPurchasesScreen, renderInventoryScreen, renderItemMasterScreen, renderItemRelationshipsScreen, renderWastageScreen, renderSupplierDuesScreen, renderSupplierMasterScreen } from "./procurement-inventory.js";
 import { renderDailyReport, renderSalesReport, renderPurchaseReport, renderExpenseReport, renderStockReport, renderPlReport, renderGstReport, renderUpiReport, renderSupplierReport, dashboardToday } from "./reporting.js";
 import { renderExpenseCategoriesScreen, renderUsersScreen, renderAutomationScreen } from "./automation.js";
+import { renderMasterCategoriesScreen, renderSupplierMasterEnhanced } from "./master-data.js";
 import { renderDocumentsScreen } from "./documents.js";
 import { renderMarketplaceImportScreen } from "./marketplace-imports.js";
 import { renderBudgetScreen } from "./budget.js";
@@ -60,8 +61,9 @@ const NAV = [
     group: "Masters",
     items: [
       { path: "master-items", label: "Items", icon: "•" },
+      { path: "master-relations", label: "Item Relationships", icon: "↔" },
       { path: "master-suppliers", label: "Suppliers", icon: "•" },
-      { path: "master-categories", label: "Expense Categories", icon: "•", phase: "Phase 2 — Financial Engine" },
+      { path: "master-categories", label: "Categories", icon: "•" },
       { path: "master-accounts", label: "Accounts", icon: "•" },
       { path: "master-users", label: "Users", icon: "•", phase: "Phase 2 — Financial Engine" },
     ],
@@ -255,8 +257,9 @@ async function renderRoute() {
     "supplier-dues": (target) => renderSupplierDuesScreen(target, currentAppUser),
     documents: (target) => renderDocumentsScreen(target, currentAppUser),
     "master-items": (target) => renderItemMasterScreen(target, currentAppUser),
-    "master-suppliers": (target) => renderSupplierMasterScreen(target, currentAppUser),
-    "master-categories": (target) => renderExpenseCategoriesScreen(target, currentAppUser),
+    "master-relations": (target) => renderItemRelationshipsScreen(target, currentAppUser),
+    "master-suppliers": (target) => renderSupplierMasterEnhanced(target, currentAppUser),
+    "master-categories": (target) => renderMasterCategoriesScreen(target, currentAppUser),
     "master-users": (target) => renderUsersScreen(target, currentAppUser),
     automation: (target) => renderAutomationScreen(target, currentAppUser),
     "report-daily": renderDailyReport,
