@@ -144,6 +144,51 @@ export function attachDropdown(trigger, menu, { openClass = "is-open" } = {}) {
   return () => { document.removeEventListener("click", onDocumentClick, true); document.removeEventListener("keydown", onKeydown); setOpen(false); };
 }
 
+export function wireScreenTabs(screen, { tabSelector = ".screen-tab", panelAttr = "data-tab-panel" } = {}) {
+  const tabs = [...screen.querySelectorAll(tabSelector)];
+  tabs.forEach(tab => tab.addEventListener("click", () => {
+    tabs.forEach(t => t.classList.toggle("is-active", t === tab));
+    screen.querySelectorAll(`[${panelAttr}]`).forEach(panel => {
+      panel.classList.toggle("hidden", panel.getAttribute(panelAttr) !== tab.dataset.tab);
+    });
+  }));
+}
+
+export function createItemCombobox(input, getItems, { onSelect, getSubtitle = () => "" } = {}) {
+  if (!input) return { refresh() {} };
+  const wrap = input.parentElement;
+  wrap.classList.add("combobox");
+  const menu = document.createElement("div");
+  menu.className = "combobox-menu hidden";
+  wrap.appendChild(menu);
+  let activeIndex = -1, matches = [];
+  const highlight = (name, q) => {
+    const i = q ? name.toLowerCase().indexOf(q.toLowerCase()) : -1;
+    if (i === -1) return escUi(name);
+    return `${escUi(name.slice(0, i))}<mark>${escUi(name.slice(i, i + q.length))}</mark>${escUi(name.slice(i + q.length))}`;
+  };
+  const render = raw => {
+    const q = raw.trim();
+    const items = getItems();
+    matches = (q ? items.filter(i => i.name.toLowerCase().includes(q.toLowerCase())) : items).slice(0, 8);
+    menu.innerHTML = matches.length ? matches.map((item, i) => `<button type="button" class="combobox-option ${i === activeIndex ? "is-active" : ""}" data-index="${i}"><span class="combobox-option-name">${highlight(item.name, q)}</span><span class="combobox-option-sub">${escUi(getSubtitle(item) || "")}</span></button>`).join("") : `<div class="combobox-empty">No matching items</div>`;
+    menu.classList.remove("hidden");
+    menu.querySelectorAll(".combobox-option").forEach(btn => btn.addEventListener("mousedown", e => { e.preventDefault(); choose(matches[Number(btn.dataset.index)]); }));
+  };
+  const choose = item => { if (!item) return; input.value = item.name; menu.classList.add("hidden"); activeIndex = -1; onSelect?.(item); };
+  input.addEventListener("input", () => { activeIndex = -1; render(input.value); if (!input.value) onSelect?.(null); });
+  input.addEventListener("focus", () => render(input.value));
+  input.addEventListener("keydown", e => {
+    if (menu.classList.contains("hidden")) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); activeIndex = Math.min(activeIndex + 1, matches.length - 1); render(input.value); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); activeIndex = Math.max(activeIndex - 1, 0); render(input.value); }
+    else if (e.key === "Enter") { if (activeIndex >= 0) { e.preventDefault(); choose(matches[activeIndex]); } }
+    else if (e.key === "Escape") { menu.classList.add("hidden"); }
+  });
+  document.addEventListener("click", e => { if (!wrap.contains(e.target)) menu.classList.add("hidden"); });
+  return { refresh: () => render(input.value) };
+}
+
 export function setButtonLoading(button, loading, loadingLabel = "Working…") {
   if (!button) return;
   if (loading) { button.dataset.originalLabel = button.textContent; button.disabled = true; button.classList.add("is-loading"); button.innerHTML = `<span class="spinner" aria-hidden="true"></span><span>${escUi(loadingLabel)}</span>`; }

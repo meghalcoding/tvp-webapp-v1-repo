@@ -114,6 +114,35 @@ The live deployment the user was viewing (`tvp-finapp.meghalcoding.workers.dev`)
 
 Please redeploy this zip (not the previous one) to `tvp-finapp.meghalcoding.workers.dev`, and if the old styling still shows afterward, do a hard refresh (or clear the site's Service Worker in DevTools → Application → Service Workers) — the app is a PWA with an offline cache, so an old build can persist locally even after a new one is deployed until the cache version changes and the browser picks it up.
 
+## Round 5 — 2026-08-26 — Expenses form: item-search-first entry + chip/row item picker
+
+Two workflow-level UX changes to the Expenses screen, chosen from a broader review of Purchases/Expenses UX gaps.
+
+### 1. Item search is now the single primary entry point
+
+Previously the form led with two competing fields side by side — Category and Search item — with a disambiguation panel for when they conflicted. Now:
+- `#expense-item-search` is the sole primary field at the top of the form (`.expense-entry-primary`), larger (44px height) and autofocused.
+- The Category `<select>` moved into a `<details>`/`<summary>` disclosure ("Or browse by category") for the fallback case of not knowing the item name. It's still the same `<select name="category_id">` the submit handler reads from FormData — nothing about the save payload changed.
+- Removed the native `required` attribute from the category `<select>` (redundant with — and now in tension with — the existing manual JS check `if (!categoryId) status(feedback, "Choose an Expense Category.", true)`; native required validation on a field inside a closed `<details>` was an unnecessary edge case to carry).
+- A small hint under the search field (`#expense-category-hint`) confirms which category got auto-resolved ("Category: Kitchen Supplies") so the fallback doesn't need to be opened to see what happened.
+- Field order intentionally not changed to match Purchases' Supplier→Items order in this pass — that was a separate suggestion the user didn't select this round.
+
+### 2. Linked category items now start as chips, not fully-expanded rows
+
+This was the sparse-matrix-form problem: selecting a category with 10+ linked items used to render every item as a full 5-field row immediately, most of them blank. Now:
+- `renderCategoryItems()` renders each linked item as a compact pill (`.expense-item-chip`) in `.expense-item-chips`.
+- Tapping a chip removes it and expands that item into the full qty/rate/GST/amount row (`.expense-item-row`) in `.expense-item-rows`, focused and scrolled into view — this is the existing `makeItemRow()` logic, now parameterized to append to either container.
+- Each expanded row gained a small × button (`.expense-item-remove`) that removes the row and puts the item back as a chip — previously there was no way to un-add an item short of clearing every field by hand.
+- Searching an item still auto-expands straight to a row (skips the chip state for that one item), matching the previous "jump straight to what I searched for" behavior.
+
+**Correctness fix found and fixed while making this change**: the old `setCategoryFromItem()` always called `renderCategoryItems()` on every search match, which rebuilt the entire item list from scratch — meaning searching a *second* item within the *same already-open* category silently discarded any values already entered for the first item. New `expandItemInPlace()` checks whether the target category is already active and, if so, expands the item's existing chip (or focuses its existing row) instead of rebuilding. Also updated the OCR multi-item apply handler (`expenseOcrButton` click handler), which previously assumed every extracted item already had a row — it now calls `expandItemInPlace()` for each extracted item before filling values, so multi-item OCR receipts still populate every line correctly under the new chip system.
+
+### Verification performed
+
+- `node tools/check.mjs` / `node tools/check-design.mjs` — passed.
+- Built an isolated interactive test harness reproducing the real chip/row/search logic (not mocked — same functions) and, in a headless browser: selected a category → confirmed chips render; clicked a chip → confirmed it expands to a focused row; entered a quantity, then searched a second item in the same category → confirmed the first item's quantity and amount were preserved (this is the regression the correctness fix above addresses); clicked the row's × → confirmed it reverts to a chip and the total recalculates. Screenshotted each step.
+- Checked mobile width (390px) — chips wrap correctly, expanded row fields stack cleanly.
+
 ### Still open (not touched this pass — flagging rather than silently skipping)
 
 - No live Supabase-connected QA was possible in this environment (no network access to Supabase). Data-dependent rendering (real item lists, real balances) is unverified.

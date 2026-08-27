@@ -1,4 +1,4 @@
-import { toast, confirmDialog, promptDialog, friendlyError, setButtonLoading } from "./ui.js";
+import { toast, confirmDialog, promptDialog, friendlyError, setButtonLoading, createItemCombobox, wireScreenTabs } from "./ui.js";
 import { supabase, IS_CONFIGURED } from "./supabase-client.js";
 import { canDo } from "./auth.js";
 import { openDocumentOcrReview } from "./document-ocr.js";
@@ -199,41 +199,50 @@ export async function renderExpensesScreen(screen, user) {
   const categoryNames = new Map(categories.map((c) => [c.id, c.name]));
   const accountNames = new Map(accounts.map((a) => [a.id, a.name]));
 
-  screen.innerHTML = `<div class="screen-head"><div><h1>Expenses</h1><p>Choose a category or search an item. Only items where you enter a value become expense lines. Supplier is optional.</p></div></div>
+  screen.innerHTML = `<div class="screen-head"><div><h1>Expenses</h1><p>Search for what you spent on — its category and rate load automatically. Only items you add are recorded.</p></div></div>
+  <div class="screen-tabs"><button type="button" class="screen-tab is-active" data-tab="new">New entry</button><button type="button" class="screen-tab" data-tab="history">History</button></div>
+  <div data-tab-panel="new">
   <div class="card"><div class="card-title">New expense</div>
     <form id="expense-form">
-      <div class="expense-entry-toolbar">
-        <div class="field">
-          <label>Category</label>
-          <select name="category_id" id="expense-category" required><option value="">Choose category</option>${categories.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select>
-        </div>
-        <div class="field expense-item-search-field">
-          <label>Search item</label>
-          <input id="expense-item-search" list="expense-master-item-options" placeholder="Type an item name…" autocomplete="off">
-          <datalist id="expense-master-item-options">${relations.items.filter(i => (relations.expenseMap || []).some(x => x.item_id === i.id)).map(i => `<option value="${esc(i.name)}">${esc(i.unit || "")}</option>`).join("")}</datalist>
-          <small class="muted">Selecting an item automatically selects its Expense Category when there is one unambiguous match.</small>
-        </div>
-      </div>
-      <div id="expense-item-category-choice" class="expense-item-category-choice hidden"></div>
-      <div id="expense-category-items" class="expense-category-items">
-        <div class="empty-state muted">Choose a category or search for an item to load its linked master items.</div>
-      </div>
-      <div class="expense-entry-summary">
-        <div><span>Total expense</span><strong id="expense-total">₹0.00</strong></div>
-        <small class="muted">Blank item rows are ignored. Enter quantity, rate, or amount only for items you actually incurred.</small>
-      </div>
       <div class="expense-secondary-fields">
         <div class="field"><label>Supplier / Vendor <span class="muted">(optional)</span></label><select name="supplier_id" id="expense-supplier"><option value="">Choose vendor</option></select><small class="muted">Supplier is optional and does not determine the category or items.</small></div>
         <div class="field"><label>Paid from</label><select name="paid_from_account_id"><option value="">Unpaid — add to expense dues</option>${accountOptions(accounts, ["cash", "bank", "collection_account"])}</select></div>
         <div class="field"><label>Date</label><input name="txn_date" type="date" value="${today()}" required></div>
-        <div class="field"><label>Document type</label><select name="document_type"><option value="receipt">Receipt</option><option value="invoice">Invoice</option><option value="bill">Bill</option><option value="other">Other</option></select></div>
         <div class="field field-wide"><label>Invoice / receipt (optional)</label><input name="document_file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp"><button type="button" class="btn btn-small document-ocr-button hidden" id="expense-ocr-button">Extract details from document</button><small>PDF/JPG/PNG/WEBP · max 10 MB. You can attach it later from Recent expenses.</small></div>
+      </div>
+      <details class="more-options"><summary>More options</summary><div class="form-grid">
+        <div class="field"><label>Document type</label><select name="document_type"><option value="receipt">Receipt</option><option value="invoice">Invoice</option><option value="bill">Bill</option><option value="other">Other</option></select></div>
         <div class="field field-wide"><label>Note (optional)</label><input name="description" maxlength="500" placeholder="Optional expense note"></div>
+      </div></details>
+      <div class="card-title">Items</div>
+      <div class="expense-entry-primary">
+        <div class="field expense-item-search-field">
+          <label>Search item</label>
+          <input id="expense-item-search" placeholder="Type what you spent on…" autocomplete="off">
+          <small class="muted" id="expense-category-hint">Type an item name — its category loads automatically.</small>
+        </div>
+        <details class="expense-category-fallback" id="expense-category-fallback">
+          <summary>Or browse by category</summary>
+          <div class="field">
+            <label>Category</label>
+            <select name="category_id" id="expense-category"><option value="">Choose category</option>${categories.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select>
+          </div>
+        </details>
+      </div>
+      <div id="expense-item-category-choice" class="expense-item-category-choice hidden"></div>
+      <div id="expense-category-items" class="expense-category-items">
+        <div class="empty-state muted">Search for an item, or browse by category, to load items you can add.</div>
+      </div>
+      <div class="expense-entry-summary">
+        <div><span>Total expense</span><strong id="expense-total">₹0.00</strong></div>
+        <small class="muted">Only added items are recorded — remove one with × if you added it by mistake.</small>
       </div>
       <div class="form-status"></div><button class="btn btn-primary">Record expense</button>
     </form>
   </div>
-  <div class="card table-wrap"><div class="card-title">Recent expenses</div><table class="ledger"><thead><tr><th>Date</th><th>Category</th><th>Paid from</th><th>Note</th><th>Entry</th><th class="num">Amount</th><th>Payment</th><th>Document</th></tr></thead><tbody id="expenses-history-body"></tbody></table><div class="history-controls" id="expenses-history-controls"></div></div>`;
+  </div>
+  <div data-tab-panel="history" class="hidden"><div class="card table-wrap"><div class="card-title">Recent expenses</div><table class="ledger"><thead><tr><th>Date</th><th>Category</th><th>Paid from</th><th>Note</th><th>Entry</th><th class="num">Amount</th><th>Payment</th><th>Document</th></tr></thead><tbody id="expenses-history-body"></tbody></table><div class="history-controls" id="expenses-history-controls"></div></div></div>`;
+  wireScreenTabs(screen);
 
   createHistoryController({
     tbody: screen.querySelector("#expenses-history-body"), controls: screen.querySelector("#expenses-history-controls"), type: "expense",
@@ -254,7 +263,15 @@ export async function renderExpensesScreen(screen, user) {
   const itemHost = screen.querySelector("#expense-category-items");
   const totalEl = screen.querySelector("#expense-total");
   const supplierSelect = screen.querySelector("#expense-supplier");
+  const categoryHintEl = screen.querySelector("#expense-category-hint");
+  const categoryFallback = screen.querySelector("#expense-category-fallback");
   let activeCategoryId = "";
+  const updateCategoryHint = (categoryId) => {
+    if (!categoryHintEl) return;
+    const name = categories.find(c => c.id === categoryId)?.name;
+    if (name) { categoryHintEl.textContent = `Category: ${name}`; categoryHintEl.classList.add("resolved"); }
+    else { categoryHintEl.textContent = "Type an item name — its category loads automatically."; categoryHintEl.classList.remove("resolved"); }
+  };
 
   const linkedItemsForCategory = categoryId => {
     const ids = expenseItemIdsForCategory(relations, categoryId);
@@ -274,13 +291,19 @@ export async function renderExpensesScreen(screen, user) {
     return Math.round(total * 100) / 100;
   };
 
+  const lockIcon = locked => locked
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>';
   const syncExpenseInputLock = (input, button, label, locked) => {
     if (!input || !button) return;
     input.disabled = locked;
     input.readOnly = locked;
     input.dataset.locked = String(locked);
     input.classList.toggle("is-editable", !locked);
-    button.textContent = locked ? `Modify ${label}` : `Lock ${label}`;
+    button.classList.add("lock-toggle");
+    button.innerHTML = lockIcon(locked);
+    button.title = locked ? `Modify ${label}` : `Lock ${label}`;
+    button.setAttribute("aria-label", locked ? `Modify ${label}` : `Lock ${label}`);
     button.setAttribute("aria-pressed", String(!locked));
   };
   const syncExpenseRateControl = (input, button, state) => {
@@ -294,7 +317,7 @@ export async function renderExpensesScreen(screen, user) {
     syncExpenseInputLock(input, button, "Rate", Boolean(state.rateLocked));
   };
 
-  const makeItemRow = item => {
+  const makeItemRow = (item, hostEl) => {
     const row = document.createElement("div");
     row.className = "expense-item-row";
     const masterRate = Number(item.master_rate ?? item.last_purchase_rate ?? 0);
@@ -304,10 +327,10 @@ export async function renderExpensesScreen(screen, user) {
       masterRate, rate: masterRate > 0 ? masterRate : "", rateLocked: masterRate > 0, rateOverridden: false,
       masterGstRate: masterGst, gstRate: masterGst, gstLocked: true, gstOverridden: false
     };
-    row.innerHTML = `<div class="expense-item-main"><strong>${esc(item.name)}</strong><span>${esc(item.unit || "—")}</span></div>
+    row.innerHTML = `<div class="expense-item-main"><button type="button" class="expense-item-remove" aria-label="Remove ${esc(item.name)} from this expense">×</button><div class="expense-item-name"><strong>${esc(item.name)}</strong><span>${esc(item.unit || "—")}</span></div></div>
       <label><span>Qty</span><input data-qty type="number" min="0" step="0.001" inputmode="decimal" placeholder="—"></label>
-      <label class="rate-wrap"><span>Rate</span><div class="rate-control"><input data-rate type="number" min="0" step="0.01" inputmode="decimal" value="${masterRate > 0 ? masterRate : ""}" placeholder="Rate" disabled><button type="button" class="rate-modify btn btn-small">Modify Rate</button></div></label>
-      <label class="gst-wrap"><span>GST %</span><div class="gst-control"><input data-gst type="number" min="0" max="100" step="0.01" inputmode="decimal" value="${masterGst}" placeholder="GST" disabled><button type="button" class="gst-modify btn btn-small">Modify GST</button></div></label>
+      <label class="rate-wrap"><span>Rate</span><div class="rate-control"><input data-rate type="number" min="0" step="0.01" inputmode="decimal" value="${masterRate > 0 ? masterRate : ""}" placeholder="Rate" disabled><button type="button" class="rate-modify btn btn-small">Modify Rate</button></div><span class="rate-warning badge badge-warning hidden">Rate differs from master</span></label>
+      <label class="gst-wrap"><span>GST %</span><div class="gst-control"><input data-gst type="number" min="0" max="100" step="0.01" inputmode="decimal" value="${masterGst}" placeholder="GST" disabled><button type="button" class="gst-modify btn btn-small">Modify GST</button></div><span class="gst-warning badge badge-warning hidden">GST differs from master</span></label>
       <label class="expense-amount-field"><span>Amount</span><input data-amount type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount"></label>`;
 
     const qty = row.querySelector("[data-qty]");
@@ -327,6 +350,7 @@ export async function renderExpensesScreen(screen, user) {
       const calculated = q > 0 && r >= 0 ? Math.round((q * r * (1 + g / 100)) * 100) / 100 : 0;
       amount.value = calculated ? calculated.toFixed(2) : "";
       row._expenseState.amount = calculated;
+      row.classList.toggle("has-value", calculated > 0);
       calculateTotal();
     };
 
@@ -335,6 +359,7 @@ export async function renderExpensesScreen(screen, user) {
       const st = row._expenseState;
       st.rate = rate.value === "" ? "" : Number(rate.value);
       st.rateOverridden = Number(st.masterRate) > 0 && st.rate !== "" && Number(st.rate) !== Number(st.masterRate);
+      row.querySelector(".rate-warning")?.classList.toggle("hidden", !st.rateOverridden);
       row._expenseState.manualAmount = false;
       syncAmount();
     });
@@ -342,12 +367,14 @@ export async function renderExpensesScreen(screen, user) {
       const st = row._expenseState;
       st.gstRate = gst.value === "" ? "" : Number(gst.value);
       st.gstOverridden = st.masterGstRate !== null && st.gstRate !== "" && Number(st.gstRate) !== Number(st.masterGstRate);
+      row.querySelector(".gst-warning")?.classList.toggle("hidden", !st.gstOverridden);
       row._expenseState.manualAmount = false;
       syncAmount();
     });
     amount.addEventListener("input", () => {
       row._expenseState.manualAmount = true;
       row._expenseState.amount = Number(amount.value || 0);
+      row.classList.toggle("has-value", row._expenseState.amount > 0);
       calculateTotal();
     });
     rateBtn.addEventListener("click", () => {
@@ -365,40 +392,95 @@ export async function renderExpensesScreen(screen, user) {
 
     syncExpenseRateControl(rate, rateBtn, row._expenseState);
     syncExpenseInputLock(gst, gstBtn, "GST", true);
-    itemHost.append(row);
+    row.querySelector(".expense-item-remove").addEventListener("click", () => {
+      row.remove();
+      calculateTotal();
+      const chipHost = itemHost.querySelector("#expense-item-chips");
+      if (chipHost) makeChip(item, chipHost);
+    });
+    (hostEl || itemHost).append(row);
     return row;
   };
 
+  // Linked items for a category start life as compact chips — tapping one
+  // expands it into the full qty/rate/GST/amount row. Only expanded (added)
+  // items are recorded, so the chip/row split doubles as a visual answer to
+  // "what will actually be saved when I submit".
+  const makeChip = (item, chipHostEl) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "expense-item-chip";
+    chip.dataset.itemId = item.id;
+    chip.innerHTML = `<span>${esc(item.name)}</span>${item.unit ? `<small>${esc(item.unit)}</small>` : ""}`;
+    chip.addEventListener("click", () => {
+      chip.remove();
+      const rowHost = itemHost.querySelector("#expense-item-rows");
+      const row = makeItemRow(item, rowHost);
+      row.classList.add("is-focused");
+      requestAnimationFrame(() => { row.scrollIntoView({ block: "nearest", behavior: "smooth" }); row.querySelector("[data-qty]")?.focus(); });
+    });
+    chipHostEl.append(chip);
+    return chip;
+  };
+
+  // If the item is already an expanded row, just focus it. If it's still a
+  // chip, click it (reusing the same expand path) instead of rebuilding the
+  // whole category — this is what lets someone search a second item in the
+  // same category without losing the first item's entered values.
+  const expandItemInPlace = (itemId) => {
+    const existingRow = [...itemHost.querySelectorAll(".expense-item-row")].find(r => r._expenseState?.itemId === itemId);
+    if (existingRow) {
+      existingRow.classList.add("is-focused");
+      requestAnimationFrame(() => { existingRow.scrollIntoView({ block: "nearest", behavior: "smooth" }); existingRow.querySelector("[data-qty]")?.focus(); });
+      return true;
+    }
+    const chip = itemHost.querySelector(`.expense-item-chip[data-item-id="${itemId}"]`);
+    if (chip) { chip.click(); return true; }
+    return false;
+  };
 
   const renderCategoryItems = (categoryId, focusItemId = "") => {
     activeCategoryId = categoryId || "";
     const items = categoryId ? linkedItemsForCategory(categoryId) : [];
     if (!items.length) {
-      itemHost.innerHTML = categoryId ? `<div class="empty-state muted">No Master Items are linked to this Expense Category yet.</div>` : `<div class="empty-state muted">Choose a category or search for an item to load its linked master items.</div>`;
-      calculateTotal(); refreshSuppliers(supplierSelect.value || ""); return;
+      itemHost.innerHTML = categoryId ? `<div class="empty-state muted">No Master Items are linked to this Expense Category yet.</div>` : `<div class="empty-state muted">Search for an item, or browse by category, to load items you can add.</div>`;
+      calculateTotal(); refreshSuppliers(supplierSelect.value || ""); updateCategoryHint(categoryId); return;
     }
-    itemHost.innerHTML = `<div class="expense-items-heading"><div><strong>${esc(categories.find(c=>c.id===categoryId)?.name || "Expense items")}</strong><span>${items.length} linked item${items.length===1?"":"s"}</span></div><span class="muted">Enter only the items you actually incurred.</span></div>`;
-    items.forEach(item => makeItemRow(item));
+    itemHost.innerHTML = `<div class="expense-items-heading"><div><strong>${esc(categories.find(c=>c.id===categoryId)?.name || "Expense items")}</strong><span>${items.length} linked item${items.length===1?"":"s"}</span></div><span class="muted">Tap an item to add it.</span></div><div class="expense-item-chips" id="expense-item-chips"></div><div class="expense-item-rows" id="expense-item-rows"></div>`;
+    const chipHost = itemHost.querySelector("#expense-item-chips");
+    const rowHost = itemHost.querySelector("#expense-item-rows");
+    items.forEach(item => {
+      if (item.id === focusItemId) makeItemRow(item, rowHost);
+      else makeChip(item, chipHost);
+    });
     refreshSuppliers(supplierSelect.value || "");
     if (focusItemId) {
       const target = [...itemHost.querySelectorAll(".expense-item-row")].find(r => r._expenseState.itemId === focusItemId);
       if (target) { target.classList.add("is-focused"); requestAnimationFrame(() => target.scrollIntoView({ block: "nearest", behavior: "smooth" })); target.querySelector("[data-qty]")?.focus(); }
     }
     calculateTotal();
+    updateCategoryHint(categoryId);
   };
 
   const setCategoryFromItem = itemId => {
     const categoryIds = expenseCategoriesForItem(relations, itemId);
     categoryChoice.classList.add("hidden"); categoryChoice.innerHTML = "";
-    if (categoryIds.length === 1) {
-      categorySelect.value = categoryIds[0];
-      renderCategoryItems(categoryIds[0], itemId);
-      return;
-    }
+    const resolve = (categoryId) => {
+      categoryChoice.classList.add("hidden");
+      if (categoryId === activeCategoryId && itemHost.querySelector(".expense-item-row,.expense-item-chip")) {
+        expandItemInPlace(itemId);
+      } else {
+        categorySelect.value = categoryId;
+        renderCategoryItems(categoryId, itemId);
+      }
+      updateCategoryHint(categoryId);
+      itemSearch.value = ""; itemSearch.focus();
+    };
+    if (categoryIds.length === 1) { resolve(categoryIds[0]); return; }
     if (categoryIds.length > 1) {
       categoryChoice.classList.remove("hidden");
       categoryChoice.innerHTML = `<div><strong>This item belongs to multiple Expense Categories.</strong><span>Choose the category for this expense.</span></div><div class="expense-category-choice-buttons">${categoryIds.map(id => `<button type="button" class="btn btn-small" data-category-choice="${id}">${esc(categoryNames.get(id) || "Category")}</button>`).join("")}</div>`;
-      categoryChoice.querySelectorAll("[data-category-choice]").forEach(btn => btn.addEventListener("click", () => { categorySelect.value = btn.dataset.categoryChoice; categoryChoice.classList.add("hidden"); renderCategoryItems(btn.dataset.categoryChoice, itemId); }));
+      categoryChoice.querySelectorAll("[data-category-choice]").forEach(btn => btn.addEventListener("click", () => resolve(btn.dataset.categoryChoice)));
     }
   };
 
@@ -408,11 +490,10 @@ export async function renderExpensesScreen(screen, user) {
     categoryChoice.classList.add("hidden"); itemSearch.value = ""; renderCategoryItems(categorySelect.value); 
   });
 
-  itemSearch.addEventListener("input", () => {
-    const query = itemSearch.value.trim().toLowerCase();
-    const picked = relations.items.find(i => i.name.toLowerCase() === query && (relations.expenseMap || []).some(x => x.item_id === i.id));
-    if (!picked) return;
-    setCategoryFromItem(picked.id);
+  const expenseSearchableItems = relations.items.filter(i => (relations.expenseMap || []).some(x => x.item_id === i.id));
+  createItemCombobox(itemSearch, () => expenseSearchableItems, {
+    onSelect: picked => { if (picked) setCategoryFromItem(picked.id); },
+    getSubtitle: i => Number(i.master_rate ?? i.last_purchase_rate ?? 0) > 0 ? `Last ₹${Number(i.master_rate ?? i.last_purchase_rate)}` : ""
   });
 
   refreshSuppliers();
@@ -429,6 +510,7 @@ export async function renderExpensesScreen(screen, user) {
         const first = result.items.find(x => x.item?.id);
         if (first) { itemSearch.value = first.item.name; setCategoryFromItem(first.item.id); }
         setTimeout(() => {
+          result.items.forEach(x => { if (x.item?.id) expandItemInPlace(x.item.id); });
           result.items.forEach(x => {
             const row = [...itemHost.querySelectorAll(".expense-item-row")].find(r => r._expenseState.itemId === x.item?.id);
             if (!row) return;
