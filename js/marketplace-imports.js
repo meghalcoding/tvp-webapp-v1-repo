@@ -292,7 +292,7 @@ async function renderBatchPreview(screen,user,batchId) {
       </tr>`).join("")}
       </tbody></table></div>
       <div class="form-status" id="batch-status"></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+      <div class="inline-actions-end">
         <button class="btn" id="save-import-review">Save edits</button>
         <button class="btn btn-primary" id="commit-import">Commit selected new sales</button>
       </div>

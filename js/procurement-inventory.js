@@ -1,3 +1,4 @@
+import { toast, confirmDialog, promptDialog, friendlyError, setButtonLoading } from "./ui.js";
 import { supabase, IS_CONFIGURED } from "./supabase-client.js";
 import { canDo } from "./auth.js";
 import { withOfflineFallback } from "./offline-queue.js";
@@ -237,7 +238,7 @@ export async function renderPurchasesScreen(screen,user){
   };
   screen.addEventListener("click",async e=>{
     const orderButton=e.target.closest(".franchise-order-image");
-    if(orderButton){try{orderButton.disabled=true;orderButton.textContent="Preparing…";await drawOrderImage(orderButton.dataset.txnId,orderButton.dataset.date,orderButton.dataset.supplierId);}catch(err){window.__toast(window.__friendlyError(err),{type:"error"});}finally{orderButton.disabled=false;orderButton.textContent="Order image";}return;}
+    if(orderButton){try{orderButton.disabled=true;orderButton.textContent="Preparing…";await drawOrderImage(orderButton.dataset.txnId,orderButton.dataset.date,orderButton.dataset.supplierId);}catch(err){toast(friendlyError(err),{type:"error"});}finally{orderButton.disabled=false;orderButton.textContent="Order image";}return;}
     const documentButton=e.target.closest(".document-attach");
     if(documentButton){const detail=[...purchases].find(x=>x.id===documentButton.dataset.txnId)?.purchase_details;const d=Array.isArray(detail)?detail[0]:detail;await openDocumentModal({screen,transactionId:documentButton.dataset.txnId,supplierId:d?.supplier_id||null,user,onDone:async()=>{try{await decorateDocumentCells(screen,[documentButton.dataset.txnId],canDo(user,"record_purchase"));}catch(error){console.error(error);}}});}
   });
@@ -253,9 +254,9 @@ export async function renderPurchasesScreen(screen,user){
     const rateOverrides=activeRows.map((row,i)=>({line:lines[i],master:Number(row._purchaseState.masterRate),actual:Number(lines[i].rate)})).filter(x=>x.master>0&&x.actual!==x.master);
     const gstOverrides=activeRows.map((row,i)=>({line:lines[i],master:Number(row._purchaseState.masterGstRate),actual:Number(lines[i].gst_rate)})).filter(x=>x.actual!==x.master);
     let updateMasterRates=false,updateMasterGstRates=false;
-    if(rateOverrides.length&&user.role==="owner")updateMasterRates=await window.__confirmDialog({title:"Purchase rate differs from master",body:"Choose whether this rate should become the new master rate or apply only to this purchase.",confirmLabel:"Update master rate",cancelLabel:"Use for this purchase only"});
-    if(gstOverrides.length&&user.role==="owner")updateMasterGstRates=await window.__confirmDialog({title:"GST differs from master",body:"Choose whether this GST rate should become the new master GST rate or apply only to this purchase.",confirmLabel:"Update master GST",cancelLabel:"Use for this purchase only"});
-    if((rateOverrides.length||gstOverrides.length)&&user.role!=="owner")window.__toast("Changed rates/GST percentages will apply to this purchase only. Only the Owner can update master values.",{type:"info"});
+    if(rateOverrides.length&&user.role==="owner")updateMasterRates=await confirmDialog({title:"Purchase rate differs from master",body:"Choose whether this rate should become the new master rate or apply only to this purchase.",confirmLabel:"Update master rate",cancelLabel:"Use for this purchase only"});
+    if(gstOverrides.length&&user.role==="owner")updateMasterGstRates=await confirmDialog({title:"GST differs from master",body:"Choose whether this GST rate should become the new master GST rate or apply only to this purchase.",confirmLabel:"Update master GST",cancelLabel:"Use for this purchase only"});
+    if((rateOverrides.length||gstOverrides.length)&&user.role!=="owner")toast("Changed rates/GST percentages will apply to this purchase only. Only the Owner can update master values.",{type:"info"});
     state(feedback,"Recording purchase…");
     const documentFile=fd.get("document_file");
     if(documentFile?.size&&!navigator.onLine){state(feedback,"Document uploads require an internet connection. Remove the file or reconnect before recording this purchase.",true);return;}

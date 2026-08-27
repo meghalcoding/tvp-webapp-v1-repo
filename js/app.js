@@ -11,7 +11,7 @@ import { renderMasterCategoriesScreen, renderSupplierMasterEnhanced } from "./ma
 import { renderDocumentsScreen } from "./documents.js";
 import { renderMarketplaceImportScreen } from "./marketplace-imports.js";
 import { renderBudgetScreen } from "./budget.js";
-import { toast, confirmDialog, promptDialog, friendlyError, setButtonLoading } from "./ui.js";
+import { toast, confirmDialog, promptDialog, friendlyError, setButtonLoading, attachDropdown } from "./ui.js";
 
 // ============================================================================
 // NAV TREE — exactly the structure in spec §15
@@ -45,6 +45,7 @@ const NAV = [
 const ALL_ITEMS = NAV.flatMap(g => g.items);
 const BOTTOM_NAV_PATHS = ['dashboard','sales','expenses','purchases'];
 let currentAppUser = null;
+let navShortcutBound = false;
 
 // ============================================================================
 // BOOTSTRAP
@@ -58,18 +59,24 @@ async function boot() {
     if (session) await enterApp();
     else showLogin();
 
-    onAuthStateChange(async (event, session) => {
-      try {
-        if (event === "SIGNED_OUT" || !session) { showLogin(); return; }
-        // SIGNED_IN/USER_UPDATED can require a bootstrap; token refreshes are
-        // deliberately ignored by auth.js so the active form remains intact.
-        if (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "INITIAL_SESSION") {
-          if (document.getElementById("app-shell")?.classList.contains("hidden") || !currentAppUser) await enterApp();
-        }
-      } catch (error) {
-        console.error("Auth state handling failed:", error);
-        showAuthError(error);
+    onAuthStateChange((event, session) => {
+      // Supabase invokes auth callbacks while its internal auth lock is held.
+      // Do not await getSession()/database work directly inside this callback;
+      // schedule the application bootstrap after the callback returns.
+      if (event === "SIGNED_OUT" || !session) {
+        currentAppUser = null;
+        showLogin();
+        return;
       }
+      if (event !== "SIGNED_IN" && event !== "USER_UPDATED" && event !== "INITIAL_SESSION") return;
+      setTimeout(async () => {
+        try {
+          if (document.getElementById("app-shell")?.classList.contains("hidden") || !currentAppUser) await enterApp();
+        } catch (error) {
+          console.error("Auth state handling failed:", error);
+          showAuthError(error);
+        }
+      }, 0);
     });
   } catch (error) {
     console.error("Application bootstrap failed:", error);
@@ -128,9 +135,12 @@ function wireLoginForm() {
     setButtonLoading(submit, true, "Signing in…");
     try {
       await signIn(email, password);
+      // Bootstrap directly after signInWithPassword resolves. This avoids
+      // depending on the asynchronous SIGNED_IN callback for the first render.
+      await enterApp();
     } catch (err) {
       console.error("Sign-in failed:", err);
-      errEl.textContent = "Sign-in failed. Check your email and password and try again.";
+      errEl.textContent = friendlyError(err, "Sign-in failed. Check your email and password and try again.");
     } finally { setButtonLoading(submit, false); }
   });
 }
@@ -146,6 +156,32 @@ function renderUserBadges() {
 // ============================================================================
 // NAV RENDERING
 // ============================================================================
+function applyNavSearch(container, input, { grouped = false } = {}) {
+  if (!container || !input) return;
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    const links = [...container.querySelectorAll(grouped ? '.nav-link' : '.more-link')];
+    links.forEach(link => {
+      const matches = !q || link.textContent.toLowerCase().includes(q);
+      link.classList.toggle('nav-hidden', !matches);
+    });
+    if (!grouped) return;
+    container.querySelectorAll('.nav-group').forEach(group => {
+      const groupLinks = [...group.querySelectorAll('.nav-link')];
+      const visible = groupLinks.some(link => !link.classList.contains('nav-hidden'));
+      const secondaryMatch = q && groupLinks.some(link => link.classList.contains('secondary') && !link.classList.contains('nav-hidden'));
+      group.classList.toggle('nav-search-empty', !visible);
+      if (q && visible) group.classList.remove('is-collapsed');
+      group.classList.toggle('show-secondary', Boolean(secondaryMatch || group.dataset.manualExpanded === 'true'));
+    });
+  });
+}
+
+function focusMobileMenuSearch() {
+  location.hash = '#/more';
+  requestAnimationFrame(() => setTimeout(() => document.getElementById('more-search')?.focus(), 0));
+}
+
 function renderNav() {
   const sidebar = document.getElementById('sidebar-nav');
   sidebar.innerHTML = `<div class="nav-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="nav-search" type="search" placeholder="Search menu…" aria-label="Search menu"></div>` + NAV.map((group, gi) => `
@@ -153,15 +189,64 @@ function renderNav() {
       <button type="button" class="nav-group-toggle" aria-expanded="true"><span>${group.group}</span><span class="nav-chevron">⌄</span></button>
       <div class="nav-group-items">${group.items.map(navLinkHtml).join('')}</div>
     </section>`).join('');
-  sidebar.querySelectorAll('.nav-group-toggle').forEach(btn => btn.addEventListener('click', () => { const expanded = btn.getAttribute('aria-expanded') === 'true'; btn.setAttribute('aria-expanded', String(!expanded)); btn.closest('.nav-group').classList.toggle('is-collapsed', expanded); }));
-  sidebar.querySelector('#nav-search')?.addEventListener('input', e => { const q = e.target.value.trim().toLowerCase(); sidebar.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('nav-hidden', q && !a.textContent.toLowerCase().includes(q))); sidebar.querySelectorAll('.nav-group').forEach(g => { const visible = [...g.querySelectorAll('.nav-link')].some(a => !a.classList.contains('nav-hidden')); g.classList.toggle('nav-search-empty', !visible); if(q && visible) g.classList.remove('is-collapsed'); }); });
-  const navSearch=sidebar.querySelector('#nav-search'); window.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();navSearch?.focus();navSearch?.select();}});
-  sidebar.querySelectorAll('.nav-group').forEach(group => { const items = group.querySelectorAll('.nav-link.secondary'); if(items.length) { const more = document.createElement('button'); more.type='button'; more.className='nav-show-more'; more.textContent='Show more'; more.addEventListener('click',()=>{ group.classList.toggle('show-secondary'); more.textContent=group.classList.contains('show-secondary')?'Show less':'Show more'; }); group.querySelector('.nav-group-items').appendChild(more); } });
+  sidebar.querySelectorAll('.nav-group-toggle').forEach(btn => btn.addEventListener('click', () => {
+    const group = btn.closest('.nav-group');
+    const expanded = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', String(!expanded));
+    group.classList.toggle('is-collapsed', expanded);
+    group.dataset.manualExpanded = String(!expanded);
+    if (expanded) group.classList.remove('show-secondary');
+  }));
+  applyNavSearch(sidebar, sidebar.querySelector('#nav-search'), { grouped: true });
+  const navSearch = sidebar.querySelector('#nav-search');
+  if (!navShortcutBound) {
+    window.addEventListener('keydown', e => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (window.matchMedia('(max-width: 899px)').matches) focusMobileMenuSearch();
+        else { document.getElementById('nav-search')?.focus(); document.getElementById('nav-search')?.select(); }
+      }
+    });
+    navShortcutBound = true;
+  }
+  sidebar.querySelectorAll('.nav-group').forEach(group => {
+    const items = group.querySelectorAll('.nav-link.secondary');
+    if (items.length) {
+      const more = document.createElement('button'); more.type = 'button'; more.className = 'nav-show-more'; more.textContent = 'Show more';
+      more.addEventListener('click', () => {
+        const expanded = group.classList.toggle('show-secondary');
+        group.dataset.manualExpanded = String(expanded);
+        more.textContent = expanded ? 'Show less' : 'Show more';
+      });
+      group.querySelector('.nav-group-items').appendChild(more);
+    }
+  });
   const bottom = document.getElementById('bottom-nav');
-  bottom.innerHTML = BOTTOM_NAV_PATHS.map(path => navLinkHtml(ALL_ITEMS.find(i=>i.path===path))).join('') + navLinkHtml({path:'more',label:'More',icon:'more'});
-  document.querySelectorAll('.nav-link').forEach(el => el.addEventListener('click', e => { e.preventDefault(); const path=el.dataset.path; location.hash = `#/${path}`; }));
+  bottom.innerHTML = BOTTOM_NAV_PATHS.map(path => navLinkHtml(ALL_ITEMS.find(i => i.path === path))).join('') + navLinkHtml({path:'more',label:'More',icon:'more'});
+  document.querySelectorAll('.nav-link').forEach(el => el.addEventListener('click', e => { e.preventDefault(); location.hash = `#/${el.dataset.path}`; }));
+  const mobileSearch = document.getElementById('mobile-nav-search');
+  if (mobileSearch) mobileSearch.onclick = focusMobileMenuSearch;
+  initSidebarCollapse();
 }
-function navLinkHtml(item) { return `<a href="#/${item.path}" class="nav-link ${item.secondary?'secondary':''}" data-path="${item.path}"><span class="icon">${ICONS[item.icon] || ICONS.masters}</span><span class="label">${item.label}</span></a>`; }
+const SIDEBAR_COLLAPSE_KEY = 'tvp_sidebar_collapsed';
+function initSidebarCollapse() {
+  const sidebarEl = document.querySelector('.sidebar');
+  const toggle = document.getElementById('sidebar-collapse-toggle');
+  if (!sidebarEl || !toggle || toggle.dataset.bound) return;
+  toggle.dataset.bound = '1';
+  const apply = (collapsed) => {
+    sidebarEl.classList.toggle('is-collapsed', collapsed);
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+    toggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+  };
+  apply(localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1');
+  toggle.addEventListener('click', () => {
+    const collapsed = !sidebarEl.classList.contains('is-collapsed');
+    apply(collapsed);
+    localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? '1' : '0');
+  });
+}
+function navLinkHtml(item) { return `<a href="#/${item.path}" class="nav-link ${item.secondary?'secondary':''}" data-path="${item.path}" title="${item.label}"><span class="icon">${ICONS[item.icon] || ICONS.masters}</span><span class="label">${item.label}</span></a>`; }
 function setActiveNav(path) { const active = path === 'reports' || path.startsWith('report-') ? 'reports' : path; document.querySelectorAll('.nav-link').forEach(el => el.classList.toggle('active', el.dataset.path === active)); }
 
 // ============================================================================
@@ -267,10 +352,10 @@ async function renderDashboard(screen) {
 
   if (accErr || stockErr || upiErr) {
     screen.innerHTML = `<div class="placeholder-screen"><h2>Couldn't load the dashboard</h2>
-      <p>${accErr?.message || stockErr?.message || upiErr?.message}</p>
-      <p style="font-size:0.8rem;">If this is a brand-new project, make sure you've run db/schema.sql,
-      db/rls_policies.sql, and db/seed.sql, and that your signed-in user has a row in the users table.</p>
+      <p class="muted">We could not load the latest dashboard data.</p>
+      <p class="muted">If this is a brand-new project, make sure the required database setup has been completed.</p>
       </div>`;
+    toast(friendlyError(accErr || stockErr || upiErr), { type: "error" });
     return;
   }
 
@@ -302,7 +387,7 @@ async function renderDashboard(screen) {
           .map(
             (r) => `<div class="stat-row"><span class="stat-label">${r.name}</span>
               <span class="stat-value ${Number(r.pending) > 0 ? "negative" : "positive"}">₹${fmt(r.pending)}
-              <span class="stamp ${Number(r.pending) > 0 ? "pending" : "settled"}" style="margin-left:6px;">
+              <span class="stamp ${Number(r.pending) > 0 ? "pending" : "settled"} stamp-inline">
                 ${Number(r.pending) > 0 ? "Pending" : "Settled"}</span></span></div>`
           )
           .join("") || emptyRow("No collection accounts yet")}
@@ -323,13 +408,16 @@ async function renderDashboard(screen) {
 
     <div class="card quick-actions-card">
       <div class="card-title">Quick actions</div>
-      <div class="quick-actions"><button class="btn btn-primary" id="quick-new">+ New</button><div class="quick-action-menu hidden" id="quick-menu"><a href="#/sales">Sale</a><a href="#/purchases">Purchase</a><a href="#/expenses">Expense</a><a href="#/transfers">Money transfer</a><a href="#/inventory">Stock adjustment</a><a href="#/daily-closing">Daily closing</a></div></div>
+      <div class="quick-actions"><button class="btn btn-primary" id="quick-new" aria-haspopup="true" aria-expanded="false">+ New</button><div class="quick-action-menu hidden" id="quick-menu"><a href="#/sales">Sale</a><a href="#/purchases">Purchase</a><a href="#/expenses">Expense</a><a href="#/transfers">Money transfer</a><a href="#/inventory">Stock adjustment</a><a href="#/daily-closing">Daily closing</a></div></div>
     </div>`;
-  document.getElementById("quick-new")?.addEventListener("click", () => document.getElementById("quick-menu")?.classList.toggle("hidden"));
+  const quickNew = document.getElementById("quick-new");
+  const quickMenu = document.getElementById("quick-menu");
+  if (quickNew && quickMenu) attachDropdown(quickNew, quickMenu);
 }
 
 function renderMoreScreen(screen) {
-  screen.innerHTML=`<div class="screen-head"><div><h1>More</h1><p>Everything else, grouped the same way as the desktop navigation.</p></div></div><div class="more-grid">${NAV.filter(g=>g.group!=='Overview').map(g=>`<section class="card more-section"><h2>${g.group}</h2><div class="more-links">${g.items.map(i=>`<a href="#/${i.path}" class="more-link"><span class="icon">${ICONS[i.icon]||ICONS.masters}</span><span>${i.label}</span></a>`).join('')}</div></section>`).join('')}</div>`;
+  screen.innerHTML=`<div class="screen-head"><div><h1>More</h1><p>Search every destination from one mobile workspace.</p></div></div><div class="mobile-more-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="more-search" type="search" placeholder="Search menu…" aria-label="Search menu"></div><div class="more-grid">${NAV.filter(g=>g.group!=='Overview').map(g=>`<section class="card more-section"><h2>${g.group}</h2><div class="more-links">${g.items.map(i=>`<a href="#/${i.path}" class="more-link"><span class="icon">${ICONS[i.icon]||ICONS.masters}</span><span>${i.label}</span></a>`).join('')}</div></section>`).join('')}</div>`;
+  applyNavSearch(screen, screen.querySelector('#more-search'));
 }
 
 async function renderReportsHub(screen) {
@@ -347,12 +435,12 @@ function notConfiguredCard() {
     <h2>Connect Supabase</h2>
     <p>Open <code>js/config.js</code> and set <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code>
     from your Supabase project's Settings → API page, then reload.</p>
-    <p style="font-size:0.8rem;">See README.md for the full setup checklist (schema, RLS, seed data, first user).</p>
+    <p class="muted">See README.md for the full setup checklist (schema, RLS, seed data, first user).</p>
   </div>`;
 }
 
 function emptyRow(text) {
-  return `<div class="stat-row"><span class="stat-label" style="color:var(--steel);">${text}</span></div>`;
+  return `<div class="stat-row"><span class="stat-label muted">${text}</span></div>`;
 }
 
 function fmt(n) {
@@ -367,37 +455,27 @@ function renderBackupScreen(screen) {
   screen.innerHTML = `
     <div class="card">
       <div class="card-title">Backup</div>
-      <p>Supabase's free tier doesn't guarantee automatic backups, so backup is a feature of this app, not
-      an assumption about the hosting (spec §13). Export regularly — weekly at minimum, and always after
-      closing the books on the 1st of the month.</p>
+      <p class="muted">Export regularly — weekly at minimum, and always after closing the books on the 1st of the month.</p>
       <div class="fab-row">
-        <button class="btn btn-primary" id="btn-full-backup" ${allowed ? "" : "disabled"}>⇩ Export Full Backup (JSON)</button>
-        <button class="btn" id="btn-module-backup" ${allowed ? "" : "disabled"}>⇩ Export Module Backups (CSV)</button>
+        <button class="btn btn-primary" id="btn-full-backup" ${allowed ? "" : "disabled"}>Export Full Backup (JSON)</button>
+        <button class="btn" id="btn-module-backup" ${allowed ? "" : "disabled"}>Export Module Backups (CSV)</button>
       </div>
-      ${allowed ? "" : `<p style="font-size:0.8rem;color:var(--chutney-red);margin-top:10px;">Only the Owner can export or restore backups.</p>`}
-      <div id="backup-status" style="font-size:0.85rem;margin-top:12px;"></div>
+      ${allowed ? "" : `<p class="form-status error">Only the Owner can export or restore backups.</p>`}
     </div>`;
 
-  document.getElementById("btn-full-backup")?.addEventListener("click", async () => {
-    const status = document.getElementById("backup-status");
-    status.textContent = "Exporting full backup…";
-    try {
-      await exportFullBackup();
-      status.textContent = "Full backup downloaded.";
-    } catch (err) {
-      status.textContent = `Backup failed: ${err.message}`;
-    }
+  const fullButton = document.getElementById("btn-full-backup");
+  const moduleButton = document.getElementById("btn-module-backup");
+  fullButton?.addEventListener("click", async () => {
+    setButtonLoading(fullButton, true, "Exporting…");
+    try { await exportFullBackup(); toast("Full backup downloaded.", { type: "success" }); }
+    catch (err) { toast(friendlyError(err), { type: "error" }); }
+    finally { setButtonLoading(fullButton, false); }
   });
-
-  document.getElementById("btn-module-backup")?.addEventListener("click", async () => {
-    const status = document.getElementById("backup-status");
-    status.textContent = "Exporting module backups…";
-    try {
-      await exportModuleBackups();
-      status.textContent = "Module backups downloaded.";
-    } catch (err) {
-      status.textContent = `Backup failed: ${err.message}`;
-    }
+  moduleButton?.addEventListener("click", async () => {
+    setButtonLoading(moduleButton, true, "Exporting…");
+    try { await exportModuleBackups(); toast("Module backups downloaded.", { type: "success" }); }
+    catch (err) { toast(friendlyError(err), { type: "error" }); }
+    finally { setButtonLoading(moduleButton, false); }
   });
 }
 
@@ -411,7 +489,7 @@ function renderSettingsScreen(screen) {
     </div>
     <div class="card">
       <div class="card-title">Coming later</div>
-      <p style="font-size:0.85rem;">GST number, reorder-level defaults, and currency/number-format settings are
+      <p class="muted">GST number, reorder-level defaults, and currency/number-format settings are
       part of the Masters/Settings work in Phase 2+.</p>
     </div>`;
 }

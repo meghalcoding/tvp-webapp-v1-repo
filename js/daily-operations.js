@@ -1,3 +1,4 @@
+import { toast, confirmDialog, promptDialog, friendlyError, setButtonLoading } from "./ui.js";
 import { supabase, IS_CONFIGURED } from "./supabase-client.js";
 import { canDo } from "./auth.js";
 import { openDocumentOcrReview } from "./document-ocr.js";
@@ -273,7 +274,6 @@ export async function renderExpensesScreen(screen, user) {
     return Math.round(total * 100) / 100;
   };
 
-<<<<<<< HEAD
   const syncExpenseInputLock = (input, button, label, locked) => {
     if (!input || !button) return;
     input.disabled = locked;
@@ -294,14 +294,11 @@ export async function renderExpensesScreen(screen, user) {
     syncExpenseInputLock(input, button, "Rate", Boolean(state.rateLocked));
   };
 
-=======
->>>>>>> 85113897e4af68fa8c9bb83c5b90664562897551
   const makeItemRow = item => {
     const row = document.createElement("div");
     row.className = "expense-item-row";
     const masterRate = Number(item.master_rate ?? item.last_purchase_rate ?? 0);
     const masterGst = Number(item.gst_rate || 0);
-<<<<<<< HEAD
     row._expenseState = {
       itemId: item.id, amount: 0, manualAmount: false,
       masterRate, rate: masterRate > 0 ? masterRate : "", rateLocked: masterRate > 0, rateOverridden: false,
@@ -326,25 +323,12 @@ export async function renderExpensesScreen(screen, user) {
         calculateTotal();
         return;
       }
-=======
-    row._expenseState = { itemId: item.id, amount: 0, manualAmount: false };
-    row.innerHTML = `<div class="expense-item-main"><strong>${esc(item.name)}</strong><span>${esc(item.unit || "—")}</span></div>
-      <label><span>Qty</span><input data-qty type="number" min="0" step="0.001" inputmode="decimal" placeholder="—"></label>
-      <label><span>Rate</span><input data-rate type="number" min="0" step="0.01" inputmode="decimal" value="${masterRate || ""}" placeholder="Rate"></label>
-      <label><span>GST %</span><input data-gst type="number" min="0" max="100" step="0.01" inputmode="decimal" value="${masterGst}" placeholder="GST"></label>
-      <label class="expense-amount-field"><span>Amount</span><input data-amount type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount"></label>`;
-
-    const qty = row.querySelector("[data-qty]"), rate = row.querySelector("[data-rate]"), gst = row.querySelector("[data-gst]"), amount = row.querySelector("[data-amount]");
-    const syncAmount = () => {
-      if (row._expenseState.manualAmount) { row._expenseState.amount = Number(amount.value || 0); calculateTotal(); return; }
->>>>>>> 85113897e4af68fa8c9bb83c5b90664562897551
       const q = Number(qty.value || 0), r = Number(rate.value || 0), g = Number(gst.value || 0);
       const calculated = q > 0 && r >= 0 ? Math.round((q * r * (1 + g / 100)) * 100) / 100 : 0;
       amount.value = calculated ? calculated.toFixed(2) : "";
       row._expenseState.amount = calculated;
       calculateTotal();
     };
-<<<<<<< HEAD
 
     qty.addEventListener("input", syncAmount);
     rate.addEventListener("input", () => {
@@ -381,18 +365,11 @@ export async function renderExpensesScreen(screen, user) {
 
     syncExpenseRateControl(rate, rateBtn, row._expenseState);
     syncExpenseInputLock(gst, gstBtn, "GST", true);
-=======
-    qty.addEventListener("input", syncAmount); rate.addEventListener("input", syncAmount); gst.addEventListener("input", syncAmount);
-    amount.addEventListener("input", () => { row._expenseState.manualAmount = true; row._expenseState.amount = Number(amount.value || 0); calculateTotal(); });
->>>>>>> 85113897e4af68fa8c9bb83c5b90664562897551
     itemHost.append(row);
     return row;
   };
 
-<<<<<<< HEAD
 
-=======
->>>>>>> 85113897e4af68fa8c9bb83c5b90664562897551
   const renderCategoryItems = (categoryId, focusItemId = "") => {
     activeCategoryId = categoryId || "";
     const items = categoryId ? linkedItemsForCategory(categoryId) : [];
@@ -425,15 +402,9 @@ export async function renderExpensesScreen(screen, user) {
     }
   };
 
-<<<<<<< HEAD
   categorySelect.addEventListener("change", async () => {
     const currentHasValues = [...itemHost.querySelectorAll(".expense-item-row")].some(r => Number(r._expenseState?.amount || 0) > 0);
-    if (currentHasValues && categorySelect.value !== activeCategoryId && !(await window.__confirmDialog({title:"Change expense category?",body:"Changing the category will clear the item entries you have already entered.",confirmLabel:"Change category",cancelLabel:"Keep current entries"}))) { categorySelect.value = activeCategoryId; return; }
-=======
-  categorySelect.addEventListener("change", () => {
-    const currentHasValues = [...itemHost.querySelectorAll(".expense-item-row")].some(r => Number(r._expenseState?.amount || 0) > 0);
-    if (currentHasValues && categorySelect.value !== activeCategoryId && !window.confirm("Changing category will clear the current item entries. Continue?")) { categorySelect.value = activeCategoryId; return; }
->>>>>>> 85113897e4af68fa8c9bb83c5b90664562897551
+    if (currentHasValues && categorySelect.value !== activeCategoryId && !(await confirmDialog({title:"Change expense category?",body:"Changing the category will clear the item entries you have already entered.",confirmLabel:"Change category",cancelLabel:"Keep current entries"}))) { categorySelect.value = activeCategoryId; return; }
     categoryChoice.classList.add("hidden"); itemSearch.value = ""; renderCategoryItems(categorySelect.value); 
   });
 
@@ -480,7 +451,6 @@ export async function renderExpensesScreen(screen, user) {
     const amount = Math.round(lines.reduce((sum, x) => sum + Number(x.state.amount || 0), 0) * 100) / 100;
     if (!categoryId) { status(feedback, "Choose an Expense Category.", true); return; }
     if (!lines.length || amount <= 0) { status(feedback, "Enter a quantity or amount for at least one item.", true); return; }
-<<<<<<< HEAD
     const items = lines.map(({row,state}) => ({
       item_id: state.itemId,
       description: row.querySelector(".expense-item-main strong")?.textContent || "",
@@ -504,13 +474,13 @@ export async function renderExpensesScreen(screen, user) {
     let updateMasterRates = false;
     let updateMasterGstRates = false;
     if (rateOverrides.length && user.role === "owner") {
-      updateMasterRates = await window.__confirmDialog({title:"Expense rate differs from master",body:"Choose whether this rate should become the new master rate or apply only to this expense.",confirmLabel:"Update master rate",cancelLabel:"Use for this expense only"});
+      updateMasterRates = await confirmDialog({title:"Expense rate differs from master",body:"Choose whether this rate should become the new master rate or apply only to this expense.",confirmLabel:"Update master rate",cancelLabel:"Use for this expense only"});
     }
     if (gstOverrides.length && user.role === "owner") {
-      updateMasterGstRates = await window.__confirmDialog({title:"GST differs from master",body:"Choose whether this GST rate should become the new master GST rate or apply only to this expense.",confirmLabel:"Update master GST",cancelLabel:"Use for this expense only"});
+      updateMasterGstRates = await confirmDialog({title:"GST differs from master",body:"Choose whether this GST rate should become the new master GST rate or apply only to this expense.",confirmLabel:"Update master GST",cancelLabel:"Use for this expense only"});
     }
     if ((rateOverrides.length || gstOverrides.length) && user.role !== "owner") {
-      window.__toast("Changed rates/GST percentages will apply to this expense only. Only the Owner can update master values.",{type:"info"});
+      toast("Changed rates/GST percentages will apply to this expense only. Only the Owner can update master values.",{type:"info"});
     }
     if ((updateMasterRates || updateMasterGstRates) && !navigator.onLine) {
       status(feedback, "Reconnect to update master rates/GST from this expense. The expense was not recorded.", true);
@@ -551,44 +521,12 @@ export async function renderExpensesScreen(screen, user) {
       try { status(feedback, "Expense recorded. Uploading invoice/receipt…"); await uploadDocument({ file: documentFile, documentType: formData.get("document_type") || "receipt", documentDate: formData.get("txn_date"), transactionIds: [txnId] }); }
       catch (documentError) { status(feedback, `Expense recorded, but the document could not be attached: ${documentError.message}`, true); }
     }
-=======
-    const items = lines.map(({row,state}) => ({ item_id: state.itemId, description: row.querySelector(".expense-item-main strong")?.textContent || "", quantity: row.querySelector("[data-qty]")?.value || "", unit: row.querySelector(".expense-item-main span")?.textContent || "", rate: row.querySelector("[data-rate]")?.value || "", gst_rate: row.querySelector("[data-gst]")?.value || "", amount: Number(state.amount || 0) }));
-    const documentFile = formData.get("document_file");
-    if (documentFile?.size && !navigator.onLine) { status(feedback, "Document uploads require an internet connection. Remove the file or reconnect before recording this expense.", true); return; }
-    const payload = { p_client_uuid: crypto.randomUUID(), p_category_id: categoryId, p_paid_from_account_id: formData.get("paid_from_account_id") || null, p_amount: amount, p_txn_date: formData.get("txn_date"), p_description: formData.get("description").trim() || null, p_items: items };
-    status(feedback, navigator.onLine ? "Recording expense…" : "Expense queued for sync.");
-    let txnId = null;
-    try {
-      if (!navigator.onLine && documentFile?.size) throw new Error("Reconnect before attaching a document.");
-      const isUnpaid = !payload.p_paid_from_account_id;
-      if (documentFile?.size || isUnpaid) {
-        const rpcName = isUnpaid ? "create_unpaid_expense_idempotent" : "create_expense_idempotent";
-        const rpcPayload = isUnpaid ? { p_client_uuid: payload.p_client_uuid, p_category_id: payload.p_category_id, p_amount: payload.p_amount, p_txn_date: payload.p_txn_date, p_description: payload.p_description, p_items: payload.p_items } : payload;
-        const { data, error } = await supabase.rpc(rpcName, rpcPayload); if (error) throw error; txnId = data;
-      } else {
-        const result = await postOutboxSafe("expense", payload, "create_expense_idempotent"); txnId = typeof result === "string" ? result : result?.data || null;
-      }
-    } catch (err) { status(feedback, err.message, true); return; }
-    const supplierId = formData.get("supplier_id") || null;
-    if (txnId && supplierId && navigator.onLine) {
-      try { const { error } = await supabase.rpc("set_expense_supplier", { p_transaction_id: txnId, p_supplier_id: supplierId }); if (error) throw error; }
-      catch (error) { status(feedback, `Expense recorded, but the vendor link could not be saved: ${error.message}`, true); return; }
-    }
-    if (documentFile?.size && txnId) {
-      try { status(feedback, "Expense recorded. Uploading invoice/receipt…"); await uploadDocument({ file: documentFile, documentType: formData.get("document_type") || "receipt", documentDate: formData.get("txn_date"), transactionIds: [txnId] }); }
-      catch (documentError) { status(feedback, `Expense recorded, but the document could not be attached: ${documentError.message}`, true); }
-    }
->>>>>>> 85113897e4af68fa8c9bb83c5b90664562897551
     if (navigator.onLine) await renderExpensesScreen(screen, user);
   });
 
   screen.addEventListener("click", async (event) => {
     const docButton = event.target.closest(".document-attach");
-<<<<<<< HEAD
-    if (docButton) { try { await openDocumentModal({ screen, transactionId: docButton.dataset.txnId, user, onDone: async () => { try { await decorateDocumentCells(screen, [docButton.dataset.txnId], canDo(user, "record_quick_expense")); } catch(error) { console.error(error); } } }); } catch (error) { window.__toast(window.__friendlyError(error.message),{type:"error"}); } return; }
-=======
-    if (docButton) { try { await openDocumentModal({ screen, transactionId: docButton.dataset.txnId, user, onDone: async () => { try { await decorateDocumentCells(screen, [docButton.dataset.txnId], canDo(user, "record_quick_expense")); } catch(error) { console.error(error); } } }); } catch (error) { alert(error.message); } return; }
->>>>>>> 85113897e4af68fa8c9bb83c5b90664562897551
+    if (docButton) { try { await openDocumentModal({ screen, transactionId: docButton.dataset.txnId, user, onDone: async () => { try { await decorateDocumentCells(screen, [docButton.dataset.txnId], canDo(user, "record_quick_expense")); } catch(error) { console.error(error); } } }); } catch (error) { toast(friendlyError(error.message),{type:"error"}); } return; }
     const payButton = event.target.closest(".pay-expense-due");
     if (!payButton) return;
     const amount = Number(payButton.dataset.due || 0); const accountOptionsHtml = accountOptions(accounts, ["cash", "bank", "collection_account"]); const mount = document.createElement("div"); mount.className = "document-modal-mount";
@@ -669,4 +607,4 @@ export async function renderDailyClosingScreen(screen, user) {
   screen.innerHTML = `<div class="screen-head"><div><h1>Daily Closing</h1><p>Confirm the cash count, preserve the difference, and lock the day against accidental back-dating.</p></div></div>${allowed ? `<div class="card"><div class="card-title">Close the day</div><form id="closing-form"><div class="form-grid"><div class="field"><label>Closing date</label><input name="closing_date" type="date" value="${date}" required /></div><div class="field"><label>Physical cash counted</label><input name="actual_cash" type="number" min="0" step="0.01" required /></div></div><div class="closing-preview" id="closing-preview">Loading cash position…</div><div class="card-title">Denomination count (optional)</div><div class="denomination-grid">${[500,200,100,50,20,10,5,2,1].map((n) => `<label>₹${n}<input data-denomination="${n}" type="number" min="0" step="1" value="0" /></label>`).join("")}</div><p class="muted" id="denomination-total">Denomination total: ₹0.00</p><div class="field"><label>Notes (optional)</label><textarea name="notes" rows="3"></textarea></div><div class="form-status"></div><button class="btn btn-primary">Close and lock day</button></form></div>` : '<div class="card"><p class="muted">Only an Owner or Manager can run Daily Closing.</p></div>'}<div class="card" id="closing-summary"><div class="card-title">Closing history</div><p class="muted">Loading…</p></div>`;
   await loadClosingHistory(screen, user); const form = screen.querySelector("#closing-form"); const total = screen.querySelector("#denomination-total"); const preview = async () => { const mount=screen.querySelector("#closing-preview"); if(!mount)return; const {data,error}=await supabase.rpc("daily_closing_preview",{p_closing_date:form.elements.closing_date.value}); if(error){mount.textContent=error.message;return;}const p=data?.[0];mount.innerHTML=`<div class="stat-row"><span class="stat-label">Expected Cash Drawer balance</span><span class="stat-value">${money(p?.expected_cash)}</span></div><div class="closing-metrics"><span>Cash sales: <strong>${money(p?.cash_sales)}</strong></span><span>UPI sales: <strong>${money(p?.upi_sales)}</strong></span><span>Cash expenses: <strong>${money(p?.cash_expenses)}</strong></span></div>`; }; await preview(); form?.elements.closing_date.addEventListener("change",preview); const calc = () => { const sum = [...screen.querySelectorAll("[data-denomination]")].reduce((s,input)=>s+Number(input.dataset.denomination)*Number(input.value||0),0); total.textContent=`Denomination total: ${money(sum)}`; form.elements.actual_cash.value=sum || ""; }; screen.querySelectorAll("[data-denomination]").forEach((input)=>input.addEventListener("input",calc)); form?.addEventListener("submit", async(e)=>{e.preventDefault();const fd=new FormData(form);const feedback=form.querySelector(".form-status");const denominations=Object.fromEntries([...screen.querySelectorAll("[data-denomination]")].map(i=>[i.dataset.denomination,Number(i.value||0)]));status(feedback,"Closing and locking day…");const {error}=await supabase.rpc("close_daily_operations",{p_closing_date:fd.get("closing_date"),p_actual_cash:Number(fd.get("actual_cash")),p_denominations:denominations,p_notes:fd.get("notes").trim()||null});if(error){status(feedback,error.message,true);return;}await renderDailyClosingScreen(screen,user);});
 }
-async function loadClosingHistory(screen,user){const mount=screen.querySelector("#closing-summary");const {data,error}=await supabase.from("daily_closings").select("closing_date,expected_cash,actual_cash,difference,reopened_at,notes").order("closing_date",{ascending:false}).limit(31);if(error){mount.innerHTML=`<div class="card-title">Closing history</div><p class="form-status error">${esc(error.message)}</p>`;return;}mount.innerHTML=`<div class="card-title">Closing history</div><div class="table-wrap"><table class="ledger"><thead><tr><th>Date</th><th class="num">Expected</th><th class="num">Actual</th><th class="num">Difference</th><th>Status</th><th></th></tr></thead><tbody>${(data||[]).map(r=>`<tr><td>${esc(r.closing_date)}</td><td class="num">${money(r.expected_cash)}</td><td class="num">${money(r.actual_cash)}</td><td class="num ${Number(r.difference)?"negative":""}">${money(r.difference)}</td><td>${r.reopened_at?'<span class="stamp pending">Reopened</span>':'<span class="stamp settled">Locked</span>'}</td><td>${user.role==='owner'&&!r.reopened_at?`<button class="btn btn-small reopen-day" data-date="${r.closing_date}">Reopen</button>`:''}</td></tr>`).join("")||'<tr><td colspan="6">No days closed yet.</td></tr>'}</tbody></table></div>`;mount.querySelectorAll('.reopen-day').forEach(button=>button.addEventListener('click',async()=>{const reason=await window.__promptDialog({title:`Reopen ${button.dataset.date}`,label:"Reason for reopening",submitLabel:"Reopen day",required:true});if(reason===null)return;const {error:err}=await supabase.rpc('reopen_daily_operations',{p_closing_date:button.dataset.date,p_reason:reason});if(err){window.__toast("Could not reopen this day. Please check your permissions and try again.",{type:"error"});return;}await renderDailyClosingScreen(screen,user);}));}
+async function loadClosingHistory(screen,user){const mount=screen.querySelector("#closing-summary");const {data,error}=await supabase.from("daily_closings").select("closing_date,expected_cash,actual_cash,difference,reopened_at,notes").order("closing_date",{ascending:false}).limit(31);if(error){mount.innerHTML=`<div class="card-title">Closing history</div><p class="form-status error">${esc(error.message)}</p>`;return;}mount.innerHTML=`<div class="card-title">Closing history</div><div class="table-wrap"><table class="ledger"><thead><tr><th>Date</th><th class="num">Expected</th><th class="num">Actual</th><th class="num">Difference</th><th>Status</th><th></th></tr></thead><tbody>${(data||[]).map(r=>`<tr><td>${esc(r.closing_date)}</td><td class="num">${money(r.expected_cash)}</td><td class="num">${money(r.actual_cash)}</td><td class="num ${Number(r.difference)?"negative":""}">${money(r.difference)}</td><td>${r.reopened_at?'<span class="stamp pending">Reopened</span>':'<span class="stamp settled">Locked</span>'}</td><td>${user.role==='owner'&&!r.reopened_at?`<button class="btn btn-small reopen-day" data-date="${r.closing_date}">Reopen</button>`:''}</td></tr>`).join("")||'<tr><td colspan="6">No days closed yet.</td></tr>'}</tbody></table></div>`;mount.querySelectorAll('.reopen-day').forEach(button=>button.addEventListener('click',async()=>{const reason=await promptDialog({title:`Reopen ${button.dataset.date}`,label:"Reason for reopening",submitLabel:"Reopen day",required:true});if(reason===null)return;const {error:err}=await supabase.rpc('reopen_daily_operations',{p_closing_date:button.dataset.date,p_reason:reason});if(err){toast("Could not reopen this day. Please check your permissions and try again.",{type:"error"});return;}await renderDailyClosingScreen(screen,user);}));}

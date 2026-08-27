@@ -1,3 +1,4 @@
+import { toast, confirmDialog, promptDialog, friendlyError, setButtonLoading } from "./ui.js";
 import { supabase, IS_CONFIGURED } from "./supabase-client.js";
 import { canDo } from "./auth.js";
 
@@ -98,10 +99,10 @@ async function saveTransfer(event, screen) {
 }
 
 async function reverse(transactionId, screen) {
-  const reason = await window.__promptDialog({title:"Reverse transaction",label:"Reason for this reversal (optional)",submitLabel:"Reverse"});
+  const reason = await promptDialog({title:"Reverse transaction",label:"Reason for this reversal (optional)",submitLabel:"Reverse"});
   if (reason === null) return;
   const { error } = await supabase.rpc("reverse_financial_transaction", { p_transaction_id: transactionId, p_reason: reason || null });
-  if (error) { window.__toast("Reversal failed. The transaction was not changed.",{type:"error"}); return; }
+  if (error) { toast("Reversal failed. The transaction was not changed.",{type:"error"}); return; }
   await renderTransfersScreen(screen, window.__appUser);
 }
 
