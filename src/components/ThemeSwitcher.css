@@ -1,0 +1,8 @@
+.theme-switcher { display: flex; gap: var(--space-2); }
+.theme-swatch {
+  width: 28px; height: 28px;
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+.theme-swatch-active { border-color: var(--accent-500); box-shadow: 0 0 0 2px var(--surface); }

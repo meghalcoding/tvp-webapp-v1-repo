@@ -1,0 +1,10 @@
+.banner {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+.banner-success { background: var(--success-subtle); color: var(--success-600); }
+.banner-danger  { background: var(--danger-subtle);  color: var(--danger-600); }
+.banner-warning { background: var(--warning-subtle); color: var(--warning-600); }
+.banner-info    { background: var(--info-subtle);    color: var(--info-600); }

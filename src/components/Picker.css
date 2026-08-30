@@ -1,0 +1,126 @@
+.picker-anchor { position: relative; }
+
+.picker-trigger {
+  height: var(--tap-comfortable);
+  padding: 0 var(--space-4);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+.picker-trigger:hover { border-color: var(--border-strong); }
+.picker-trigger-value { font-size: var(--text-md); color: var(--ink-900); font-weight: var(--weight-medium); }
+.picker-trigger-placeholder { font-size: var(--text-md); color: var(--ink-400); }
+.picker-chevron { color: var(--ink-500); }
+
+.picker-scrim {
+  position: fixed; inset: 0;
+  background: rgba(20, 16, 10, 0.32);
+  z-index: 40;
+  animation: picker-fade var(--duration-base) var(--ease-standard);
+}
+@keyframes picker-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* Mobile: full-height sheet, keyboard opens straight into search */
+.picker-sheet {
+  position: fixed;
+  inset: 0;
+  top: 8vh;
+  z-index: 41;
+  background: var(--surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: var(--shadow-sheet);
+  display: flex;
+  flex-direction: column;
+  animation: picker-slide-up var(--duration-sheet) var(--ease-standard);
+}
+@keyframes picker-slide-up { from { transform: translateY(24px); opacity: 0.6; } to { transform: translateY(0); opacity: 1; } }
+
+.picker-grabber {
+  width: 36px; height: 4px;
+  background: var(--border-strong);
+  border-radius: var(--radius-full);
+  margin: var(--space-3) auto 0;
+}
+
+/* Desktop: anchored popover under the trigger */
+.picker-popover {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  right: 0;
+  z-index: 41;
+  max-height: 420px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
+  display: flex;
+  flex-direction: column;
+  animation: picker-pop var(--duration-fast) var(--ease-standard);
+}
+@keyframes picker-pop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+.picker-search-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+.picker-search-input {
+  flex: 1;
+  height: var(--tap-min);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-3);
+  font-size: var(--text-md);
+  background: var(--surface-sunken);
+  outline: none;
+}
+.picker-search-input:focus { border-color: var(--accent-500); }
+.picker-cancel {
+  border: none; background: none;
+  color: var(--accent-600);
+  font-weight: var(--weight-medium);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.picker-list { overflow-y: auto; flex: 1; padding: var(--space-2); }
+.picker-empty { padding: var(--space-6) var(--space-4); text-align: center; color: var(--ink-500); font-size: var(--text-sm); }
+
+.picker-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--tap-comfortable);
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  background: none;
+  border-radius: var(--radius-md);
+  text-align: left;
+  cursor: pointer;
+}
+.picker-row:hover, .picker-row:focus-visible { background: var(--surface-sunken); }
+.picker-row-name { font-size: var(--text-md); color: var(--ink-900); font-weight: var(--weight-medium); }
+.picker-row-meta { font-size: var(--text-xs); color: var(--ink-500); display: flex; align-items: center; gap: var(--space-2); }
+.picker-row-tags { display: flex; gap: 4px; }
+.picker-tag {
+  font-style: normal;
+  background: var(--accent-subtle);
+  color: var(--accent-700);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+}
+.picker-row-create { color: var(--accent-700); font-weight: var(--weight-semibold); border-top: 1px solid var(--border); margin-top: var(--space-2); border-radius: 0; }

@@ -1,16 +1,25 @@
 {
-  "name": "tasty-vadapav-control-center",
-  "version": "1.0.0",
+  "name": "cravory-app",
   "private": true,
-  "description": "Local development and validation tooling for the Tasty Vadapav Control Center.",
+  "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node tools/dev-server.mjs",
-    "start": "node tools/dev-server.mjs",
-    "check": "node tools/check.mjs",
-    "serve": "node tools/dev-server.mjs"
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview"
   },
-  "engines": {
-    "node": ">=20"
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "oxlint": "^1.79.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.2"
   }
 }

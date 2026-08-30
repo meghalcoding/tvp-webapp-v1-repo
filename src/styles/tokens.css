@@ -1,0 +1,81 @@
+/* ============================================================
+   CRAVORY DESIGN SYSTEM — CORE TOKENS
+   Theme-independent: spacing, type scale, radius, elevation, motion.
+   Color lives in themes.css so it can swap without touching layout.
+   ============================================================ */
+
+:root {
+  /* ---- Type: one UI family, native on every platform ----
+     No decorative display face. Content is the hierarchy. */
+  --font-ui: -apple-system, "SF Pro Text", "Segoe UI", Roboto, "Inter", system-ui, sans-serif;
+  --font-mono-nums: var(--font-ui); /* tabular-nums applied directly to amounts, not a separate face */
+
+  /* Type scale — 1.2 minor-third-ish, tuned for dense data screens */
+  --text-2xs: 0.6875rem;  /* 11px — micro labels, table headers */
+  --text-xs:  0.75rem;    /* 12px — captions, helper text */
+  --text-sm:  0.8125rem;  /* 13px — secondary body */
+  --text-base: 0.9375rem; /* 15px — primary body/UI text */
+  --text-md:  1.0625rem;  /* 17px — form values, list titles */
+  --text-lg:  1.25rem;    /* 20px — section totals */
+  --text-xl:  1.75rem;    /* 28px — screen totals (e.g. today's sales) */
+  --text-2xl: 2.25rem;    /* 36px — the one hero number per screen, used sparingly */
+
+  --leading-tight: 1.15;
+  --leading-normal: 1.45;
+  --tracking-tight: -0.01em;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* ---- Spacing scale — 4px base, every layout uses these only ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ---- Radius — one family, scaled by component weight ---- */
+  --radius-sm: 8px;    /* chips, inline controls */
+  --radius-md: 12px;   /* inputs, buttons */
+  --radius-lg: 18px;   /* cards, sheets */
+  --radius-full: 999px;
+
+  /* ---- Elevation — used only to separate interactive layers
+     (sheets over content), never to decorate a flat card ---- */
+  --shadow-1: 0 1px 2px rgba(20, 16, 10, 0.06);
+  --shadow-2: 0 4px 16px rgba(20, 16, 10, 0.10);
+  --shadow-sheet: 0 -8px 32px rgba(20, 16, 10, 0.16);
+
+  /* ---- Motion — deliberate, not decorative ---- */
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-sheet: 280ms;
+
+  /* ---- Touch targets — every actionable element meets this ---- */
+  --tap-min: 44px;
+  --tap-comfortable: 52px;
+
+  /* ---- Layout ---- */
+  --content-max: 640px;      /* forms never stretch wider than this, even on desktop */
+  --dashboard-max: 1120px;
+  --rail-width: 88px;
+  --rail-width-expanded: 240px;
+  --topbar-height: 56px;
+  --tabbar-height: 64px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-sheet: 0ms;
+  }
+}

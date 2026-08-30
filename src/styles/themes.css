@@ -1,0 +1,172 @@
+/* ============================================================
+   CRAVORY DESIGN SYSTEM — THEMES
+   Gold carries primary actions. Red carries brand identity
+   (headers, nav, active states) — never buttons — so it's
+   never confused with the danger/error red. Semantic colors
+   (success/danger/warning) are fixed across every theme so a
+   mistake always reads as a mistake, whichever theme is active.
+   ============================================================ */
+
+:root,
+[data-theme="vadapav"] {
+  color-scheme: light;
+
+  /* Surfaces */
+  --bg: #FAF8F4;
+  --surface: #FFFFFF;
+  --surface-sunken: #F1ECE2;
+  --surface-raised: #FFFFFF;
+  --border: #E4DDCE;
+  --border-strong: #D2C7B2;
+
+  /* Text */
+  --ink-900: #2A2318;
+  --ink-700: #4A4032;
+  --ink-500: #756A57;
+  --ink-400: #9C9280;
+  --ink-on-brand: #FFF8EE;
+
+  /* Brand identity (headers, active nav, badges) */
+  --brand-700: #6E2420;
+  --brand-600: #8A3128;
+  --brand-500: #A6402E;
+  --brand-subtle: #F7E7E1;
+
+  /* Primary action (gold) */
+  --accent-700: #7C5A1E;
+  --accent-600: #9C7527;
+  --accent-500: #B8892F;
+  --accent-subtle: #F3E8D2;
+  --accent-on: #2A2318;
+
+  /* Semantic — fixed meaning, never themed away */
+  --success-600: #2E7D4F;
+  --success-subtle: #E7F4EB;
+  --danger-600: #C1442C;
+  --danger-subtle: #FBEAE4;
+  --warning-600: #B67A18;
+  --warning-subtle: #FBF0DC;
+  --info-600: #3A6EA5;
+  --info-subtle: #E9F1FA;
+}
+
+[data-theme="midnight"] {
+  color-scheme: dark;
+
+  --bg: #17130E;
+  --surface: #221C15;
+  --surface-sunken: #14100B;
+  --surface-raised: #2B241B;
+  --border: #3A3225;
+  --border-strong: #4C4230;
+
+  --ink-900: #F5EFE3;
+  --ink-700: #D2C6B1;
+  --ink-500: #9C917C;
+  --ink-400: #6E6555;
+  --ink-on-brand: #FFF8EE;
+
+  --brand-700: #C96A5C;
+  --brand-600: #B4564A;
+  --brand-500: #9C4438;
+  --brand-subtle: #3A241F;
+
+  --accent-700: #E8C878;
+  --accent-600: #D4AE55;
+  --accent-500: #B8892F;
+  --accent-subtle: #3C331E;
+  --accent-on: #1A150D;
+
+  --success-600: #5FBE87;
+  --success-subtle: #1C3226;
+  --danger-600: #E17557;
+  --danger-subtle: #3A2018;
+  --warning-600: #DDA53F;
+  --warning-subtle: #3A2E15;
+  --info-600: #7FADDD;
+  --info-subtle: #1E2C3A;
+}
+
+/* Clean neutral base, brand as a small accent only — for anyone
+   who finds the full brand wash too much on a finance screen. */
+[data-theme="neutral"] {
+  color-scheme: light;
+
+  --bg: #FAFAF9;
+  --surface: #FFFFFF;
+  --surface-sunken: #F1F1EF;
+  --surface-raised: #FFFFFF;
+  --border: #E2E2DF;
+  --border-strong: #CCCCC7;
+
+  --ink-900: #1D1D1B;
+  --ink-700: #46453F;
+  --ink-500: #7A7972;
+  --ink-400: #A8A69C;
+  --ink-on-brand: #FFFFFF;
+
+  --brand-700: #7A2A24;
+  --brand-600: #8A3128;
+  --brand-500: #A6402E;
+  --brand-subtle: #F2E4E1;
+
+  --accent-700: #6B6560;
+  --accent-600: #423E38;
+  --accent-500: #2A2723;
+  --accent-subtle: #EDEBE7;
+  --accent-on: #FFFFFF;
+
+  --success-600: #2E7D4F;
+  --success-subtle: #E7F4EB;
+  --danger-600: #C1442C;
+  --danger-subtle: #FBEAE4;
+  --warning-600: #B67A18;
+  --warning-subtle: #FBF0DC;
+  --info-600: #3A6EA5;
+  --info-subtle: #E9F1FA;
+}
+
+/* Higher-contrast light theme for bright-daylight counters —
+   a real operating condition (shop front, sunlight on screen),
+   not decoration: deeper saturation and darker text for glare. */
+[data-theme="daylight"] {
+  color-scheme: light;
+
+  --bg: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface-sunken: #EFEAE0;
+  --surface-raised: #FFFFFF;
+  --border: #C9BFA8;
+  --border-strong: #AFA283;
+
+  --ink-900: #16110A;
+  --ink-700: #332B1E;
+  --ink-500: #5C5240;
+  --ink-400: #7C7260;
+  --ink-on-brand: #FFFFFF;
+
+  --brand-700: #5C1D19;
+  --brand-600: #7A281F;
+  --brand-500: #96331F;
+  --brand-subtle: #F4DFD9;
+
+  --accent-700: #6B4C15;
+  --accent-600: #8C6A1C;
+  --accent-500: #A87D22;
+  --accent-subtle: #F0E0BC;
+  --accent-on: #16110A;
+
+  --success-600: #256B41;
+  --success-subtle: #DFF0E5;
+  --danger-600: #A8371F;
+  --danger-subtle: #F8DFD7;
+  --warning-600: #93630E;
+  --warning-subtle: #F6E9C9;
+  --info-600: #2C5A87;
+  --info-subtle: #DDEAF6;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink-900);
+}

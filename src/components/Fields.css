@@ -1,0 +1,65 @@
+.field { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.field-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--ink-700);
+}
+.field-required { color: var(--danger-600); }
+
+.field-help {
+  font-size: var(--text-xs);
+  color: var(--ink-500);
+  margin: 0;
+}
+.field-help-error { color: var(--danger-600); }
+
+/* Amount field: large, unmistakable, currency glued to the number */
+.field-amount-shell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--tap-comfortable);
+  padding: 0 var(--space-4);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+.field-amount-shell:focus-within {
+  border-color: var(--accent-500);
+}
+.field-invalid { border-color: var(--danger-600); }
+
+.field-amount-prefix {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  color: var(--ink-500);
+}
+.field-amount-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  color: var(--ink-900);
+  min-width: 0;
+}
+.field-amount-input::placeholder { color: var(--ink-400); font-weight: var(--weight-regular); }
+
+/* Plain text input, used for notes/names/search */
+.text-input {
+  height: var(--tap-comfortable);
+  padding: 0 var(--space-4);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-md);
+  color: var(--ink-900);
+  outline: none;
+  width: 100%;
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+.text-input:focus { border-color: var(--accent-500); }
+.text-input::placeholder { color: var(--ink-400); }
